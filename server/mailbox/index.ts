@@ -8,6 +8,9 @@
  */
 import { McpToolDefinition } from '../../shared/browser-types.js';
 import { randomUUID } from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import { getConfig } from '../config.js';
 
 export type MailPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -42,6 +45,67 @@ const messages: MailMessage[] = [];
 const agents = new Map<string, AgentPresence>();
 const MAX_MESSAGES = 500;
 
+function persistPath(): string | undefined {
+  try {
+    return getConfig().mailPersistPath;
+  } catch {
+    return process.env.MAIL_PERSIST_PATH || (process.env.VERCEL ? undefined : './data/mailbox.json');
+  }
+}
+
+function loadPersisted() {
+  const file = persistPath();
+  if (!file) return;
+  try {
+    const resolved = path.resolve(file);
+    if (!fs.existsSync(resolved)) return;
+    const raw = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+    messages.length = 0;
+    for (const m of raw.messages || []) {
+      messages.push({
+        ...m,
+        readBy: new Set(m.readBy || []),
+      });
+    }
+    agents.clear();
+    for (const a of raw.agents || []) {
+      agents.set(a.id, a);
+    }
+  } catch {
+    /* ignore corrupt store */
+  }
+}
+
+function savePersisted() {
+  const file = persistPath();
+  if (!file) return;
+  try {
+    const resolved = path.resolve(file);
+    fs.mkdirSync(path.dirname(resolved), { recursive: true });
+    fs.writeFileSync(
+      resolved,
+      JSON.stringify(
+        {
+          messages: messages.map((m) => ({ ...m, readBy: [...m.readBy] })),
+          agents: [...agents.values()],
+          savedAt: Date.now(),
+        },
+        null,
+        2
+      )
+    );
+  } catch {
+    /* Vercel read-only etc. */
+  }
+}
+
+let hydrated = false;
+function ensureHydrated() {
+  if (hydrated) return;
+  hydrated = true;
+  loadPersisted();
+}
+
 function textResult(data: unknown) {
   return { content: [{ type: 'text', text: typeof data === 'string' ? data : JSON.stringify(data, null, 2) }] };
 }
@@ -74,8 +138,10 @@ function touchAgent(id: string) {
 }
 
 function pushMessage(msg: MailMessage) {
+  ensureHydrated();
   messages.unshift(msg);
   if (messages.length > MAX_MESSAGES) messages.length = MAX_MESSAGES;
+  savePersisted();
 }
 
 export const MCP_MAIL_TOOLS: McpToolDefinition[] = [
@@ -189,6 +255,7 @@ const PRIORITY_RANK: Record<MailPriority, number> = {
 };
 
 export async function executeMailTool(name: string, args: Record<string, any>) {
+  ensureHydrated();
   switch (name) {
     case 'mail_whoami': {
       const id = args.agentId || process.env.MAIL_AGENT_ID || `agent-${process.pid}`;
@@ -196,7 +263,10 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
       return textResult({
         agentId: id,
         platform: process.env.VERCEL ? 'vercel-ephemeral' : 'long-running',
-        note: 'On Vercel, mailbox state is per warm instance only.',
+        note: persistPath()
+          ? `Persisting to ${persistPath()} (file). On Vercel without writable FS, state is warm-instance only.`
+          : 'On Vercel, mailbox state is per warm instance only. Set MAIL_PERSIST_PATH for Docker file persistence.',
+        persistPath: persistPath() || null,
       });
     }
     case 'mail_register': {
@@ -205,6 +275,7 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
         status: args.status || 'idle',
         lastSeen: Date.now(),
       });
+      savePersisted();
       return textResult({ ok: true, agent: agents.get(args.agentId) });
     }
     case 'mail_post': {
@@ -268,6 +339,7 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
       if (!msg) return textResult({ error: `message not found: ${args.id}` });
       msg.readBy.add(args.agentId);
       touchAgent(args.agentId);
+      savePersisted();
       return textResult({ message: serialize(msg) });
     }
     case 'mail_reply': {
@@ -302,7 +374,11 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
         rooms: [...rooms.entries()].map(([name, count]) => ({ name, count })),
         urgent,
         recent,
-        note: process.env.VERCEL ? 'ephemeral on Vercel warm instance' : 'in-memory process mailbox',
+        note: persistPath()
+          ? `file-backed at ${persistPath()}`
+          : process.env.VERCEL
+            ? 'ephemeral on Vercel warm instance'
+            : 'in-memory process mailbox',
       });
     }
     case 'mail_stats': {

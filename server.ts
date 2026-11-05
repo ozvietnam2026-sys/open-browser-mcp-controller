@@ -10,6 +10,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { browserState } from './server/browser-state.js';
 import { McpServerHandler, MCP_BROWSER_TOOLS, ALL_MCP_TOOLS } from './server/mcp-server.js';
+import { getVisibleTools } from './server/tools-registry.js';
+import { getConfig } from './server/config.js';
 import { executeExtractTool, EXTRACT_TOOL_NAMES } from './server/extract/index.js';
 import { executePlaywrightTool, PLAYWRIGHT_TOOL_NAMES } from './server/playwright/tools.js';
 import { executeMailTool, MAIL_TOOL_NAMES } from './server/mailbox/index.js';
@@ -79,7 +81,7 @@ app.all('/mcp', async (req: Request, res: Response) => {
         messages: '/mcp/messages',
         legacyRpc: '/api/mcp/rpc',
       },
-      tools: ALL_MCP_TOOLS.length,
+      tools: getVisibleTools().length, catalog: ALL_MCP_TOOLS.length, version: getConfig().version,
     });
   }
   if (req.method === 'POST') {
@@ -113,7 +115,7 @@ app.post('/api/extract/:tool', async (req: Request, res: Response) => {
 app.get('/api/extract/health', (_req: Request, res: Response) => {
   res.json({
     ok: true,
-    version: '3.1.0',
+    version: '4.0.0',
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],
@@ -167,20 +169,25 @@ app.post('/api/ai/:tool', async (req: Request, res: Response) => {
 // MCP Tools schema list
 app.get('/api/mcp/tools', (_req: Request, res: Response) => {
   res.json({
-    tools: ALL_MCP_TOOLS,
+    tools: getVisibleTools(),
+    toolCount: getVisibleTools().length,
+    catalogCount: ALL_MCP_TOOLS.length,
+    config: { version: getConfig().version, profile: getConfig().profile, caps: getConfig().caps },
     groups: {
-      browser: MCP_BROWSER_TOOLS.map((t) => t.name),
+      browser: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('browser_')).map((t) => t.name),
       extract: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('extract_')).map((t) => t.name),
       playwright: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('pw_')).map((t) => t.name),
       mail: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('mail_')).map((t) => t.name),
       aiWeb: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('ai_')).map((t) => t.name),
+      meta: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('meta_')).map((t) => t.name),
     },
     notes: {
-      extract: 'HTTP-based extraction — works on Vercel serverless',
-      playwright: 'Real Chromium + CDP connect/console/network/emulate/performance — Docker/local; clear error on Vercel',
+      extract: 'HTTP extraction + map/search/change/observe/llm — works on Vercel serverless',
+      playwright: 'Chromium + CDP + tabs/dialogs/storage/routes/upload/download/xy — Docker/local; clear error on Vercel',
       browser: 'Simulated in-app browser driven by the UI',
-      mail: 'In-memory agent mailbox (mailnotmilk-inspired) — works on Vercel warm instance (ephemeral)',
-      aiWeb: 'Drive logged-in browser AI UIs (browser-ai-bridge / mailnotmilk) — Docker/local only',
+      mail: 'Agent mailbox (mailnotmilk) — file persistence via MAIL_PERSIST_PATH; Vercel warm-instance otherwise',
+      aiWeb: 'Drive logged-in browser AI UIs (browser-ai-bridge) — Docker/local only',
+      meta: 'Profiles/caps/exclude/cache status — always visible',
     },
   });
 });

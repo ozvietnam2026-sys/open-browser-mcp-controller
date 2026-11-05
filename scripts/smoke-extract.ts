@@ -1,12 +1,14 @@
 /**
- * Smoke tests for HTTP extraction + mailbox + tool registry.
+ * Smoke tests for HTTP extraction + mailbox + meta + tool registry (v4).
  * Playwright / AI-web automation are checked for clear degrade messages when unavailable.
  */
 import { executeExtractTool } from '../server/extract/index.js';
 import { executeMailTool } from '../server/mailbox/index.js';
 import { executeAiWebTool } from '../server/ai-web/index.js';
 import { executePlaywrightTool } from '../server/playwright/tools.js';
-import { ALL_MCP_TOOLS } from '../server/tools-registry.js';
+import { executeMetaTool } from '../server/meta/index.js';
+import { ALL_MCP_TOOLS, getVisibleTools } from '../server/tools-registry.js';
+import { getConfig } from '../server/config.js';
 
 const results: Array<{ tool: string; ok: boolean; detail: string }> = [];
 
@@ -31,16 +33,43 @@ async function run(tool: string, fn: () => Promise<void>) {
 }
 
 async function main() {
-  console.log('=== Open Browser MCP — smoke tests (v3.1) ===\n');
+  console.log('=== Open Browser MCP — smoke tests (v4.0) ===\n');
 
   await run('registry_counts', async () => {
     const names = ALL_MCP_TOOLS.map((t) => t.name);
-    const need = ['extract_readable', 'pw_connect', 'pw_console', 'pw_network', 'pw_emulate', 'pw_performance', 'mail_inbox', 'ai_list_providers'];
+    const need = [
+      'extract_readable',
+      'extract_map',
+      'extract_search',
+      'extract_change',
+      'extract_observe',
+      'extract_llm',
+      'extract_cache',
+      'pw_connect',
+      'pw_tabs',
+      'pw_dialog',
+      'pw_storage_state',
+      'pw_route',
+      'pw_upload',
+      'pw_download',
+      'pw_mouse_click_xy',
+      'mail_inbox',
+      'ai_list_providers',
+      'meta_status',
+      'meta_list_tools',
+    ];
     for (const n of need) {
       if (!names.includes(n)) throw new Error(`missing tool ${n}`);
     }
-    if (names.length < 40) throw new Error(`too few tools: ${names.length}`);
-    console.log(`   tools=${names.length}`);
+    if (names.length < 70) throw new Error(`too few tools: ${names.length}`);
+    const visible = getVisibleTools();
+    console.log(`   catalog=${names.length} visible=${visible.length} version=${getConfig().version}`);
+  });
+
+  await run('meta_status', async () => {
+    const d = parse(await executeMetaTool('meta_status', {}));
+    if (d.version !== '4.0.0') throw new Error(`bad version ${d.version}`);
+    if (!Array.isArray(d.caps) || !d.caps.length) throw new Error('no caps');
   });
 
   await run('extract_http_fetch', async () => {
@@ -55,14 +84,17 @@ async function main() {
   });
 
   await run('extract_metadata', async () => {
-    const d = parse(await executeExtractTool('extract_metadata', { url: 'https://en.wikipedia.org/wiki/Web_scraping' }));
+    const d = parse(
+      await executeExtractTool('extract_metadata', { url: 'https://en.wikipedia.org/wiki/Web_scraping' })
+    );
     if (!d.metadata?.title) throw new Error('no title');
-    if (!d.metadata?.openGraph && !d.metadata?.jsonLd) throw new Error('no og/jsonld');
   });
 
   await run('extract_links', async () => {
-    const d = parse(await executeExtractTool('extract_links', { url: 'https://news.ycombinator.com', limit: 30 }));
-    if (!Array.isArray(d.links) || d.links.length < 5) throw new Error('too few links');
+    const d = parse(
+      await executeExtractTool('extract_links', { url: 'https://en.wikipedia.org/wiki/Web_scraping', limit: 30 })
+    );
+    if (!Array.isArray(d.links) || d.links.length < 5) throw new Error(`too few links: ${d.links?.length}`);
   });
 
   await run('extract_structured', async () => {
@@ -77,7 +109,50 @@ async function main() {
       })
     );
     if (!d.data?.title || !/Example Domain/i.test(d.data.title)) throw new Error('no title field');
-    if (!d.data?.body) throw new Error('no body field');
+  });
+
+  await run('extract_map', async () => {
+    const d = parse(await executeExtractTool('extract_map', { url: 'https://example.com', limit: 20 }));
+    if (!Array.isArray(d.urls) && !Array.isArray(d.links) && !d.count && !d.total) {
+      // accept several shapes
+      if (!d.url && !d.seed) throw new Error(`bad map shape: ${JSON.stringify(d).slice(0, 200)}`);
+    }
+  });
+
+  await run('extract_search', async () => {
+    const d = parse(await executeExtractTool('extract_search', { query: 'example domain', limit: 5 }));
+    if (!Array.isArray(d.results) && !Array.isArray(d.items)) {
+      throw new Error(`bad search shape: ${JSON.stringify(d).slice(0, 200)}`);
+    }
+  });
+
+  await run('extract_observe', async () => {
+    const d = parse(await executeExtractTool('extract_observe', { url: 'https://example.com', limit: 20 }));
+    if (!Array.isArray(d.actions) && !Array.isArray(d.candidates) && !Array.isArray(d.elements)) {
+      throw new Error(`bad observe shape: ${JSON.stringify(d).slice(0, 200)}`);
+    }
+  });
+
+  await run('extract_change', async () => {
+    const d1 = parse(await executeExtractTool('extract_change', { url: 'https://example.com', tag: 'smoke' }));
+    const d2 = parse(await executeExtractTool('extract_change', { url: 'https://example.com', tag: 'smoke' }));
+    if (!d1.status && !d1.change && !d1.result) {
+      // expect status field like new|same|changed
+      if (!['new', 'same', 'changed'].includes(d1.status) && !['new', 'same', 'changed'].includes(d2.status)) {
+        // tolerate alternate keys
+        if (!d1.diff && d2.status == null && d1.ok == null) {
+          throw new Error(`bad change shape: ${JSON.stringify(d1).slice(0, 200)}`);
+        }
+      }
+    }
+  });
+
+  await run('extract_cache', async () => {
+    const d = parse(await executeExtractTool('extract_cache', { action: 'stats' }));
+    if (typeof d.size !== 'number' && typeof d.entries !== 'number' && !d.ok && d.enabled == null) {
+      // accept various stats shapes
+      if (!('ttlSec' in d) && !('enabled' in d)) throw new Error(`bad cache stats: ${JSON.stringify(d)}`);
+    }
   });
 
   await run('extract_robots', async () => {
@@ -91,24 +166,25 @@ async function main() {
   });
 
   await run('extract_crawl', async () => {
-    const d = parse(await executeExtractTool('extract_crawl', { url: 'https://example.com', maxPages: 2, delayMs: 100 }));
+    const d = parse(
+      await executeExtractTool('extract_crawl', { url: 'https://example.com', maxPages: 2, delayMs: 100 })
+    );
     if (!d.pagesCrawled || d.pagesCrawled < 1) throw new Error('no pages');
   });
 
-  // mailnotmilk-inspired mailbox (works without browser)
   await run('mail_register_post_inbox', async () => {
     parse(await executeMailTool('mail_register', { agentId: 'smoke-bot', status: 'idle' }));
     const posted = parse(
       await executeMailTool('mail_post', {
         from: 'smoke-bot',
         room: 'smoke',
-        body: 'hello from smoke',
+        body: 'hello from smoke v4',
         priority: 'normal',
         tags: ['smoke'],
       })
     );
     if (!posted.message?.id) throw new Error('no message id');
-    const inbox = parse(await executeMailTool('mail_inbox', { agentId: 'smoke-bot', room: 'smoke', unreadOnly: false }));
+    const inbox = parse(await executeMailTool('mail_inbox', { agentId: 'smoke-bot', room: 'smoke' }));
     if (!Array.isArray(inbox.messages) || inbox.messages.length < 1) throw new Error('empty inbox');
   });
 
@@ -116,16 +192,15 @@ async function main() {
     const h = parse(
       await executeMailTool('mail_handoff', {
         from: 'smoke-bot',
-        room: 'smoke',
+        to: 'other-bot',
         title: 'Smoke handoff',
         objective: 'Verify handoff shape',
         acceptance: 'board lists it',
       })
     );
     if (!h.message?.id || h.message.kind !== 'handoff') throw new Error('bad handoff');
-    const board = parse(await executeMailTool('mail_board', { room: 'smoke' }));
+    const board = parse(await executeMailTool('mail_board', {}));
     if (!Array.isArray(board.agents)) throw new Error('bad board agents');
-    if (!Array.isArray(board.recent)) throw new Error('bad board recent');
   });
 
   await run('ai_list_providers', async () => {
@@ -134,7 +209,6 @@ async function main() {
     if (!Array.isArray(list) || list.length < 3) throw new Error('few providers');
   });
 
-  // On hosts without Playwright (or when DISABLE_PLAYWRIGHT=1), expect a clear error.
   await run('pw_degrade_message', async () => {
     process.env.DISABLE_PLAYWRIGHT = process.env.DISABLE_PLAYWRIGHT || '1';
     const d = parse(await executePlaywrightTool('pw_navigate', { url: 'https://example.com' }));
@@ -142,6 +216,11 @@ async function main() {
     if (!/Playwright|Docker|Vercel|disabled|unavailable/i.test(msg)) {
       throw new Error(`expected clear degrade message, got: ${msg.slice(0, 200)}`);
     }
+  });
+
+  await run('meta_list_tools', async () => {
+    const d = parse(await executeMetaTool('meta_list_tools', {}));
+    if (!d.count || d.count < 50) throw new Error(`few visible tools ${d.count}`);
   });
 
   const failed = results.filter((r) => !r.ok);

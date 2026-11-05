@@ -234,7 +234,7 @@ export async function getPage() {
     context = await browser!.newContext({
       viewport: { width: 1280, height: 720 },
       userAgent:
-        'OpenBrowserMCP-Playwright/3.1 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)',
+        'OpenBrowserMCP-Playwright/4.0 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)',
     });
   }
   if (!page || page.isClosed()) {
@@ -547,4 +547,322 @@ export async function evaluateScript(script: string) {
   } finally {
     await client.detach().catch(() => undefined);
   }
+}
+
+/** ---- v4 advanced helpers (playwright-mcp caps + agent-browser) ---- */
+
+let lastSnapshotText = '';
+let dialogHandlerInstalled = false;
+let lastDialog: { type: string; message: string; at: number } | null = null;
+let dialogAutoAccept: boolean | null = null;
+const routes = new Map<string, { url: string; status?: number; body?: string; contentType?: string }>();
+
+export function getLastSnapshotText() {
+  return lastSnapshotText;
+}
+
+export function setLastSnapshotText(text: string) {
+  lastSnapshotText = text;
+}
+
+/** Snapshot with optional delta vs previous (agent-browser --delta). */
+export async function buildA11ySnapshotWithDelta(
+  options: {
+    interactiveOnly?: boolean;
+    maxNodes?: number;
+    maxDepth?: number;
+    delta?: boolean;
+    includeBoxes?: boolean;
+  } = {}
+) {
+  const snap = await buildA11ySnapshot(options);
+  let deltaInfo: { mode: 'full' | 'unchanged' | 'delta'; removedLines?: number; addedLines?: number } = {
+    mode: 'full',
+  };
+  if (options.delta && lastSnapshotText) {
+    if (lastSnapshotText === snap.snapshot) {
+      deltaInfo = { mode: 'unchanged' };
+    } else {
+      const prevLines = new Set(lastSnapshotText.split('\n'));
+      const nextLines = snap.snapshot.split('\n');
+      const added = nextLines.filter((l) => !prevLines.has(l));
+      const prevArr = lastSnapshotText.split('\n');
+      const nextSet = new Set(nextLines);
+      const removed = prevArr.filter((l) => !nextSet.has(l));
+      deltaInfo = { mode: 'delta', removedLines: removed.length, addedLines: added.length };
+      // Return a compact delta view
+      (snap as any).deltaPreview = [
+        ...removed.slice(0, 40).map((l) => `- ${l}`),
+        ...added.slice(0, 40).map((l) => `+ ${l}`),
+      ].join('\n');
+    }
+  }
+  lastSnapshotText = snap.snapshot;
+  return { ...snap, delta: deltaInfo };
+}
+
+export async function listTabs() {
+  await getPage();
+  const pages = context?.pages() || [];
+  return pages.map((p, i) => ({
+    index: i,
+    url: p.url(),
+    active: p === page,
+  }));
+}
+
+export async function openTab(url?: string) {
+  await getPage();
+  const p = await context!.newPage();
+  page = p;
+  networkHooked = false;
+  consoleHooked = false;
+  await ensurePageHooks(p);
+  if (url) await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 45000 });
+  return { index: context!.pages().length - 1, url: p.url() };
+}
+
+export async function switchTab(index: number) {
+  await getPage();
+  const pages = context!.pages();
+  if (index < 0 || index >= pages.length) throw new Error(`Tab index out of range: ${index} (have ${pages.length})`);
+  page = pages[index];
+  networkHooked = false;
+  consoleHooked = false;
+  await ensurePageHooks(page);
+  return { index, url: page.url() };
+}
+
+export async function closeTab(index?: number) {
+  await getPage();
+  const pages = context!.pages();
+  const idx = index ?? pages.findIndex((p) => p === page);
+  if (idx < 0 || idx >= pages.length) throw new Error('No tab to close');
+  if (pages.length === 1) throw new Error('Cannot close the last tab — use pw_close instead');
+  await pages[idx].close();
+  const remaining = context!.pages();
+  page = remaining[Math.min(idx, remaining.length - 1)];
+  return { closed: idx, remaining: remaining.length, url: page.url() };
+}
+
+export async function installDialogHandler(autoAccept?: boolean) {
+  const p = await getPage();
+  dialogAutoAccept = autoAccept ?? null;
+  if (dialogHandlerInstalled) return { ok: true, autoAccept: dialogAutoAccept };
+  dialogHandlerInstalled = true;
+  p.on('dialog', async (dialog) => {
+    lastDialog = { type: dialog.type(), message: dialog.message(), at: Date.now() };
+    if (dialogAutoAccept === true) await dialog.accept().catch(() => undefined);
+    else if (dialogAutoAccept === false) await dialog.dismiss().catch(() => undefined);
+    // if null: leave for pw_handle_dialog (may timeout) — accept by default to avoid hang
+    else await dialog.accept().catch(() => undefined);
+  });
+  return { ok: true, autoAccept: dialogAutoAccept };
+}
+
+export function getLastDialog() {
+  return lastDialog;
+}
+
+export async function handleDialog(opts: { accept?: boolean; promptText?: string }) {
+  // For pending dialogs we rely on auto handler; expose last dialog + set policy
+  dialogAutoAccept = opts.accept !== false;
+  await installDialogHandler(dialogAutoAccept);
+  return { ok: true, policy: dialogAutoAccept ? 'accept' : 'dismiss', lastDialog };
+}
+
+export async function saveStorageState(filePath?: string) {
+  const p = await getPage();
+  const state = await p.context().storageState();
+  if (filePath) {
+    const fs = await import('fs');
+    const path = await import('path');
+    const resolved = path.resolve(filePath);
+    fs.mkdirSync(path.dirname(resolved), { recursive: true });
+    fs.writeFileSync(resolved, JSON.stringify(state, null, 2));
+    return { ok: true, path: resolved, cookies: state.cookies.length, origins: state.origins.length };
+  }
+  return { ok: true, state };
+}
+
+export async function loadStorageState(filePath: string) {
+  const fs = await import('fs');
+  const path = await import('path');
+  const resolved = path.resolve(filePath);
+  const state = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+  // Re-create context with storage state (launch mode)
+  const pw = await loadPlaywright();
+  await closePlaywright({ keepModule: true });
+  browser = await pw.chromium.launch({
+    headless: process.env.PLAYWRIGHT_HEADED !== '1',
+    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+  });
+  connectionMode = 'launch';
+  context = await browser.newContext({
+    storageState: state,
+    viewport: { width: 1280, height: 720 },
+  });
+  page = await context.newPage();
+  networkHooked = false;
+  consoleHooked = false;
+  await ensurePageHooks(page);
+  return { ok: true, path: resolved, url: page.url() };
+}
+
+export async function listCookies() {
+  const p = await getPage();
+  return p.context().cookies();
+}
+
+export async function setCookie(cookie: {
+  name: string;
+  value: string;
+  domain?: string;
+  path?: string;
+  url?: string;
+}) {
+  const p = await getPage();
+  await p.context().addCookies([
+    {
+      name: cookie.name,
+      value: cookie.value,
+      domain: cookie.domain,
+      path: cookie.path || '/',
+      url: cookie.url || p.url(),
+    } as any,
+  ]);
+  return { ok: true };
+}
+
+export async function clearCookies() {
+  const p = await getPage();
+  await p.context().clearCookies();
+  return { ok: true };
+}
+
+export async function routeMock(opts: { url: string; status?: number; body?: string; contentType?: string }) {
+  const p = await getPage();
+  const key = opts.url;
+  routes.set(key, opts);
+  await p.route(opts.url, async (route) => {
+    await route.fulfill({
+      status: opts.status ?? 200,
+      contentType: opts.contentType || 'application/json',
+      body: opts.body ?? '{"ok":true}',
+    });
+  });
+  return { ok: true, routed: key, active: routes.size };
+}
+
+export async function unroute(url?: string) {
+  const p = await getPage();
+  if (url) {
+    await p.unroute(url).catch(() => undefined);
+    routes.delete(url);
+  } else {
+    await p.unrouteAll({ behavior: 'ignoreErrors' }).catch(() => undefined);
+    routes.clear();
+  }
+  return { ok: true, active: routes.size };
+}
+
+export function listRoutes() {
+  return [...routes.values()];
+}
+
+export async function uploadFiles(opts: { ref?: string; selector?: string; paths: string[] }) {
+  const p = await getPage();
+  const target = opts.ref ? resolveRef(opts.ref) : opts.selector;
+  if (!target) throw new Error('Provide ref or selector for file input');
+  await p.locator(target).first().setInputFiles(opts.paths);
+  return { ok: true, files: opts.paths };
+}
+
+export async function waitForDownload(opts: { clickRef?: string; clickSelector?: string; timeoutMs?: number }) {
+  const p = await getPage();
+  const fs = await import('fs');
+  const path = await import('path');
+  const dir = path.resolve(process.env.OBMC_DOWNLOAD_DIR || './data/downloads');
+  fs.mkdirSync(dir, { recursive: true });
+
+  const [download] = await Promise.all([
+    p.waitForEvent('download', { timeout: opts.timeoutMs ?? 30000 }),
+    (async () => {
+      if (opts.clickRef || opts.clickSelector) {
+        const target = opts.clickRef ? resolveRef(opts.clickRef) : opts.clickSelector!;
+        await p.locator(target).first().click();
+      }
+    })(),
+  ]);
+  const suggested = download.suggestedFilename();
+  const dest = path.join(dir, suggested);
+  await download.saveAs(dest);
+  return { ok: true, path: dest, suggestedFilename: suggested };
+}
+
+export async function mouseClickXY(x: number, y: number) {
+  const p = await getPage();
+  await p.mouse.click(x, y);
+  return { ok: true, x, y };
+}
+
+export async function mouseMoveXY(x: number, y: number) {
+  const p = await getPage();
+  await p.mouse.move(x, y);
+  return { ok: true, x, y };
+}
+
+export async function selectOption(opts: { ref?: string; selector?: string; values: string[] }) {
+  const p = await getPage();
+  const target = opts.ref ? resolveRef(opts.ref) : opts.selector;
+  if (!target) throw new Error('Provide ref or selector');
+  const selected = await p.locator(target).first().selectOption(opts.values);
+  return { ok: true, selected };
+}
+
+export async function fillForm(fields: Array<{ ref?: string; selector?: string; value: string; type?: string }>) {
+  const p = await getPage();
+  const results: Array<{ target: string; ok: boolean; error?: string }> = [];
+  for (const f of fields) {
+    const target = f.ref ? resolveRef(f.ref) : f.selector;
+    if (!target) {
+      results.push({ target: '?', ok: false, error: 'missing ref/selector' });
+      continue;
+    }
+    try {
+      const loc = p.locator(target).first();
+      if (f.type === 'checkbox' || f.type === 'radio') {
+        if (f.value === 'false' || f.value === '0') await loc.uncheck();
+        else await loc.check();
+      } else if (f.type === 'select') {
+        await loc.selectOption(f.value);
+      } else {
+        await loc.fill(f.value);
+      }
+      results.push({ target, ok: true });
+    } catch (err: any) {
+      results.push({ target, ok: false, error: err?.message || String(err) });
+    }
+  }
+  return { results };
+}
+
+export async function dragDrop(opts: { fromRef?: string; fromSelector?: string; toRef?: string; toSelector?: string }) {
+  const p = await getPage();
+  const from = opts.fromRef ? resolveRef(opts.fromRef) : opts.fromSelector;
+  const to = opts.toRef ? resolveRef(opts.toRef) : opts.toSelector;
+  if (!from || !to) throw new Error('Provide from and to ref/selector');
+  await p.locator(from).first().dragTo(p.locator(to).first());
+  return { ok: true };
+}
+
+export async function highlightRef(ref: string) {
+  const p = await getPage();
+  const target = resolveRef(ref);
+  await p.locator(target).first().evaluate((el) => {
+    const prev = (el as HTMLElement).style.outline;
+    (el as HTMLElement).style.outline = '3px solid #ff00aa';
+    (el as any).__obmcOutline = prev;
+  });
+  return { ok: true, ref };
 }

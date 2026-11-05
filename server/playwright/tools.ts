@@ -4,6 +4,7 @@ import {
   playwrightUnavailableMessage,
   getPage,
   buildA11ySnapshot,
+  buildA11ySnapshotWithDelta,
   resolveRef,
   findInSnapshot,
   getNetworkLog,
@@ -20,6 +21,29 @@ import {
   startPerformanceTrace,
   stopPerformanceTrace,
   evaluateScript,
+  listTabs,
+  openTab,
+  switchTab,
+  closeTab,
+  installDialogHandler,
+  getLastDialog,
+  handleDialog,
+  saveStorageState,
+  loadStorageState,
+  listCookies,
+  setCookie,
+  clearCookies,
+  routeMock,
+  unroute,
+  listRoutes,
+  uploadFiles,
+  waitForDownload,
+  mouseClickXY,
+  mouseMoveXY,
+  selectOption,
+  fillForm,
+  dragDrop,
+  highlightRef,
 } from './runtime.js';
 
 export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
@@ -58,6 +82,7 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
         interactiveOnly: { type: 'boolean', description: 'Default true' },
         maxNodes: { type: 'number' },
         maxDepth: { type: 'number' },
+        delta: { type: 'boolean', description: 'agent-browser --delta: only report changes vs last snapshot' },
       },
     },
   },
@@ -256,6 +281,210 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
     description: 'Show Playwright connection mode (launch|cdp|persistent) and current page URL.',
     inputSchema: { type: 'object', properties: {} },
   },
+
+  {
+    name: 'pw_tabs',
+    description: 'List open tabs (playwright-mcp browser_tabs). Docker/local only.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'pw_tab_open',
+    description: 'Open a new tab, optionally navigating to a URL.',
+    inputSchema: {
+      type: 'object',
+      properties: { url: { type: 'string' } },
+    },
+  },
+  {
+    name: 'pw_tab_switch',
+    description: 'Switch active tab by zero-based index.',
+    inputSchema: {
+      type: 'object',
+      properties: { index: { type: 'number' } },
+      required: ['index'],
+    },
+  },
+  {
+    name: 'pw_tab_close',
+    description: 'Close a tab by index (default: active). Cannot close the last tab.',
+    inputSchema: {
+      type: 'object',
+      properties: { index: { type: 'number' } },
+    },
+  },
+  {
+    name: 'pw_dialog',
+    description: 'Install dialog handler / set accept|dismiss policy (playwright-mcp dialogs).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        accept: { type: 'boolean', description: 'true=accept, false=dismiss; omit to report last dialog' },
+        promptText: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'pw_storage_state',
+    description: 'Save cookies+localStorage storageState to JSON file or return inline (playwright-mcp --storage-state).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        path: { type: 'string', description: 'Optional file path; omit to return JSON' },
+      },
+    },
+  },
+  {
+    name: 'pw_set_storage_state',
+    description: 'Load storageState from a JSON file and relaunch context with it.',
+    inputSchema: {
+      type: 'object',
+      properties: { path: { type: 'string' } },
+      required: ['path'],
+    },
+  },
+  {
+    name: 'pw_cookies',
+    description: 'List, set, or clear cookies (storage capability).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['list', 'set', 'clear'] },
+        name: { type: 'string' },
+        value: { type: 'string' },
+        domain: { type: 'string' },
+        path: { type: 'string' },
+        url: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'pw_route',
+    description: 'Mock/intercept a URL pattern with custom status/body (playwright-mcp network routes).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'glob or string URL pattern' },
+        status: { type: 'number' },
+        body: { type: 'string' },
+        contentType: { type: 'string' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'pw_unroute',
+    description: 'Remove a route mock (or all if url omitted).',
+    inputSchema: {
+      type: 'object',
+      properties: { url: { type: 'string' } },
+    },
+  },
+  {
+    name: 'pw_route_list',
+    description: 'List active route mocks.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'pw_upload',
+    description: 'Upload local files to a file input via ref or selector (playwright-mcp uploads).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string' },
+        selector: { type: 'string' },
+        paths: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['paths'],
+    },
+  },
+  {
+    name: 'pw_download',
+    description: 'Wait for a download (optionally click a ref first) and save under OBMC_DOWNLOAD_DIR.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        clickRef: { type: 'string' },
+        clickSelector: { type: 'string' },
+        timeoutMs: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'pw_select',
+    description: 'Select option(s) on a <select> by ref or selector.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string' },
+        selector: { type: 'string' },
+        values: { type: 'array', items: { type: 'string' } },
+      },
+      required: ['values'],
+    },
+  },
+  {
+    name: 'pw_fill_form',
+    description: 'Fill multiple fields in one call (ref/selector + value + optional type checkbox|radio|select).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fields: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              ref: { type: 'string' },
+              selector: { type: 'string' },
+              value: { type: 'string' },
+              type: { type: 'string' },
+            },
+          },
+        },
+      },
+      required: ['fields'],
+    },
+  },
+  {
+    name: 'pw_drag',
+    description: 'Drag from one element to another by ref/selector.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromRef: { type: 'string' },
+        fromSelector: { type: 'string' },
+        toRef: { type: 'string' },
+        toSelector: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'pw_mouse_click_xy',
+    description: 'Click at viewport coordinates (vision / screenshot-driven agents).',
+    inputSchema: {
+      type: 'object',
+      properties: { x: { type: 'number' }, y: { type: 'number' } },
+      required: ['x', 'y'],
+    },
+  },
+  {
+    name: 'pw_mouse_move_xy',
+    description: 'Move mouse to viewport coordinates.',
+    inputSchema: {
+      type: 'object',
+      properties: { x: { type: 'number' }, y: { type: 'number' } },
+      required: ['x', 'y'],
+    },
+  },
+  {
+    name: 'pw_highlight',
+    description: 'Outline a ref element for visual debugging (devtools).',
+    inputSchema: {
+      type: 'object',
+      properties: { ref: { type: 'string' } },
+      required: ['ref'],
+    },
+  },
+
   {
     name: 'pw_close',
     description: 'Close Playwright session. For CDP mode, detaches without quitting the user Chrome.',
@@ -303,13 +532,16 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
         );
       }
       case 'pw_snapshot': {
-        const snap = await buildA11ySnapshot({
+        const snap = await buildA11ySnapshotWithDelta({
           interactiveOnly: args.interactiveOnly !== false,
           maxNodes: args.maxNodes,
           maxDepth: args.maxDepth,
+          delta: !!args.delta,
         });
+        const deltaLine = snap.delta ? `Delta: ${JSON.stringify(snap.delta)}\n` : '';
+        const body = (snap as any).deltaPreview && args.delta ? (snap as any).deltaPreview : snap.snapshot;
         return textResult(
-          `URL: ${snap.url}\nTitle: ${snap.title}\nRefs: ${snap.refs}\n\n${snap.snapshot}`
+          `URL: ${snap.url}\nTitle: ${snap.title}\nRefs: ${snap.refs}\n${deltaLine}\n${body}`
         );
       }
       case 'pw_find': {
@@ -501,6 +733,103 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
           )
         );
       }
+      case 'pw_tabs':
+        return textResult(JSON.stringify(await listTabs(), null, 2));
+      case 'pw_tab_open':
+        return textResult(JSON.stringify(await openTab(args.url), null, 2));
+      case 'pw_tab_switch':
+        return textResult(JSON.stringify(await switchTab(Number(args.index)), null, 2));
+      case 'pw_tab_close':
+        return textResult(JSON.stringify(await closeTab(args.index != null ? Number(args.index) : undefined), null, 2));
+      case 'pw_dialog': {
+        if (args.accept == null) {
+          await installDialogHandler();
+          return textResult(JSON.stringify({ lastDialog: getLastDialog() }, null, 2));
+        }
+        return textResult(JSON.stringify(await handleDialog({ accept: !!args.accept, promptText: args.promptText }), null, 2));
+      }
+      case 'pw_storage_state':
+        return textResult(JSON.stringify(await saveStorageState(args.path), null, 2));
+      case 'pw_set_storage_state':
+        return textResult(JSON.stringify(await loadStorageState(args.path), null, 2));
+      case 'pw_cookies': {
+        const action = args.action || 'list';
+        if (action === 'clear') return textResult(JSON.stringify(await clearCookies(), null, 2));
+        if (action === 'set') {
+          return textResult(
+            JSON.stringify(
+              await setCookie({
+                name: args.name,
+                value: args.value,
+                domain: args.domain,
+                path: args.path,
+                url: args.url,
+              }),
+              null,
+              2
+            )
+          );
+        }
+        return textResult(JSON.stringify(await listCookies(), null, 2));
+      }
+      case 'pw_route':
+        return textResult(
+          JSON.stringify(
+            await routeMock({
+              url: args.url,
+              status: args.status,
+              body: args.body,
+              contentType: args.contentType,
+            }),
+            null,
+            2
+          )
+        );
+      case 'pw_unroute':
+        return textResult(JSON.stringify(await unroute(args.url), null, 2));
+      case 'pw_route_list':
+        return textResult(JSON.stringify(listRoutes(), null, 2));
+      case 'pw_upload':
+        return textResult(
+          JSON.stringify(await uploadFiles({ ref: args.ref, selector: args.selector, paths: args.paths }), null, 2)
+        );
+      case 'pw_download':
+        return textResult(
+          JSON.stringify(
+            await waitForDownload({
+              clickRef: args.clickRef,
+              clickSelector: args.clickSelector,
+              timeoutMs: args.timeoutMs,
+            }),
+            null,
+            2
+          )
+        );
+      case 'pw_select':
+        return textResult(
+          JSON.stringify(await selectOption({ ref: args.ref, selector: args.selector, values: args.values }), null, 2)
+        );
+      case 'pw_fill_form':
+        return textResult(JSON.stringify(await fillForm(args.fields || []), null, 2));
+      case 'pw_drag':
+        return textResult(
+          JSON.stringify(
+            await dragDrop({
+              fromRef: args.fromRef,
+              fromSelector: args.fromSelector,
+              toRef: args.toRef,
+              toSelector: args.toSelector,
+            }),
+            null,
+            2
+          )
+        );
+      case 'pw_mouse_click_xy':
+        return textResult(JSON.stringify(await mouseClickXY(Number(args.x), Number(args.y)), null, 2));
+      case 'pw_mouse_move_xy':
+        return textResult(JSON.stringify(await mouseMoveXY(Number(args.x), Number(args.y)), null, 2));
+      case 'pw_highlight':
+        return textResult(JSON.stringify(await highlightRef(args.ref), null, 2));
       case 'pw_close': {
         await closePlaywright();
         return textResult('Playwright browser closed / CDP detached.');

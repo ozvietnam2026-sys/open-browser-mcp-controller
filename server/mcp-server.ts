@@ -7,7 +7,8 @@
 import { Request, Response } from 'express';
 import { browserState } from './browser-state.js';
 import { MCP_BROWSER_TOOLS } from './mcp-browser-tools.js';
-import { ALL_MCP_TOOLS, executeRegisteredTool } from './tools-registry.js';
+import { ALL_MCP_TOOLS, getVisibleTools, executeRegisteredTool } from './tools-registry.js';
+import { getConfig } from './config.js';
 
 export { MCP_BROWSER_TOOLS };
 export { ALL_MCP_TOOLS };
@@ -97,7 +98,7 @@ export class McpServerHandler {
               protocolVersion: '2024-11-05',
               serverInfo: {
                 name: 'open-browser-mcp-server',
-                version: '3.1.0',
+                version: getConfig().version,
               },
               capabilities: {
                 tools: {
@@ -128,7 +129,7 @@ export class McpServerHandler {
             jsonrpc: '2.0',
             id,
             result: {
-              tools: ALL_MCP_TOOLS,
+              tools: getVisibleTools(),
             },
           };
         }

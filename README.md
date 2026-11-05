@@ -1,116 +1,97 @@
 # Open Browser MCP Controller
 
-**EN** · In-app browser UI + MCP server with multi-strategy web extraction, CDP DevTools tools, agent mailbox, and browser-AI helpers.  
-**VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, công cụ CDP/DevTools, hộp thư agent, và điều khiển UI AI trên trình duyệt.
+**EN** · In-app browser UI + MCP server with multi-strategy web extraction, CDP DevTools, agent mailbox, browser-AI helpers, tool profiles/caps, map/search/change-tracking.  
+**VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ozvietnam.vercel.app  
-Version: **3.1.0**
+Version: **4.0.0** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
 ## English
 
 ### What this is
-A Vite + React UI paired with an Express MCP server. Agents can:
+Vite + React UI + Express MCP server. Agents can:
 
 1. Drive the **simulated in-app browser** (`browser_*`)
-2. Extract data over **plain HTTP** (`extract_*`) — works on Vercel serverless
-3. Drive **real Chromium via Playwright + CDP** (`pw_*`) — Docker / local host
-4. Use an **in-memory agent mailbox** (`mail_*`) — mailnotmilk-inspired; ephemeral on Vercel
-5. Drive **logged-in browser AI UIs** (`ai_*`) — browser-ai-bridge / mailnotmilk-inspired
+2. Extract data over **plain HTTP** (`extract_*`) — Vercel-safe (map / search / change / observe / optional LLM)
+3. Drive **real Chromium via Playwright + CDP** (`pw_*`) — Docker / local (tabs, dialogs, storage, routes, upload/download, XY)
+4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
+5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
+6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
 
-### Inspiration (what we adopted)
-
-| Project | Adopted into this repo |
+### Inspiration (reimplemented ideas)
+| Project | Adopted |
 |---|---|
-| [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) | `pw_connect` (browserURL/wsEndpoint), `pw_console` / `pw_console_message`, `pw_network` / `pw_network_request`, `pw_emulate`, `pw_performance`, `pw_evaluate`, snapshot/ref + `pw_find` |
-| [jeffrey-nz/browser-ai-bridge](https://github.com/jeffrey-nz/browser-ai-bridge) | Provider catalog, open/send/extract conversation via Playwright, CDP + persistent profile env knobs |
-| [jrb00013/mailnotmilk](https://github.com/jrb00013/mailnotmilk) | Agent mailbox (`mail_*`), handoffs, rooms/board; browser AI open/extract/send patterns in `ai_*` |
-| [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) | Readable Markdown, a11y snapshot → act on refs, network tooling |
-| [microsoft/playwright-mcp](https://github.com/microsoft/playwright-mcp) | Snapshot/refs, click/type by ref, screenshot/PDF, wait/scroll |
-| [github/github-mcp-server](https://github.com/github/github-mcp-server) | stdio + Streamable HTTP, `/mcp` single entry, tool grouping |
+| [vercel-labs/agent-browser](https://github.com/vercel-labs/agent-browser) | Snapshot/ref, `--delta`, proxy/UA/allowed-domains/contentBoundaries |
+| [vercel-labs/agent-desktop](https://github.com/vercel-labs/agent-desktop) | Coordinate click pattern → `pw_mouse_*_xy` (browser scope) |
+| [microsoft/playwright-mcp](https://github.com/microsoft/playwright-mcp) | `--caps`, storageState, tabs, dialogs, upload/download, routes, PDF |
+| [ChromeDevTools/chrome-devtools-mcp](https://github.com/ChromeDevTools/chrome-devtools-mcp) | CDP connect, console, network, emulate, performance, evaluate |
+| [github/github-mcp-server](https://github.com/github/github-mcp-server) | toolsets/profiles, `--tools` / `--exclude-tools`, Streamable HTTP + stdio |
+| [jeffrey-nz/browser-ai-bridge](https://github.com/jeffrey-nz/browser-ai-bridge) | `ai_*` provider drive without API keys |
+| [jrb00013/mailnotmilk](https://github.com/jrb00013/mailnotmilk) | `mail_*` mailbox + handoffs + board |
+| Firecrawl / Jina / Stagehand / Crawl4AI (public docs) | `extract_map`, `extract_search`, `extract_change`, `extract_readable`, `extract_observe`, `extract_llm`, schema extract |
 
-**Name resolution notes**
-- `chrome-devtools-mcp` → exact: **ChromeDevTools/chrome-devtools-mcp**
-- `browser-ai-bridge` → exact: **jeffrey-nz/browser-ai-bridge** (also related: YosefHayim/ai-browser-bridge, usedhonda/chrome-ai-bridge)
-- `mailnotmilk` → exact: **jrb00013/mailnotmilk**
+Paid browser clouds (Browserbase / Steel / Bright Data) are **not** required — use Dockerfile or CDP attach.
 
 ### Transports
-| Transport | Endpoint / command | Notes |
+| Transport | Endpoint / command |
+|---|---|
+| SSE | `GET /mcp/sse` + `POST /mcp/messages` |
+| JSON-RPC | `POST /api/mcp/rpc` |
+| Streamable HTTP | `GET\|POST /mcp` |
+| stdio | `npm run mcp:stdio` |
+
+### Tool profiles (`OBMC_PROFILE` / `meta_set_profile`)
+`minimal` · `extract` · `browser` · `full` · `devops` · `agents`  
+Also: `OBMC_CAPS`, `MCP_TOOLS`, `MCP_EXCLUDE_TOOLS`.
+
+### Vercel ✅ vs Docker ✅
+| Group | Vercel | Docker/local |
 |---|---|---|
-| SSE (legacy) | `GET /mcp/sse` + `POST /mcp/messages` | Existing clients |
-| JSON-RPC | `POST /api/mcp/rpc` | Simple curl / UI tester |
-| Streamable HTTP | `GET\|POST /mcp` | GitHub-MCP-style single URL |
-| stdio | `npm run mcp:stdio` | Local MCP clients |
-
-### Tool groups
-
-#### Extraction (Vercel ✅)
-`extract_http_fetch`, `extract_readable`, `extract_structured`, `extract_tables`, `extract_lists`, `extract_links`, `extract_metadata`, `extract_discover`, `extract_robots`, `extract_sitemap`, `extract_crawl`, `extract_paginate`, `extract_json_api`
-
-REST: `GET /api/extract/health` · `POST /api/extract/:tool`
-
-#### Playwright / Chrome DevTools (Docker/local ✅ · Vercel ❌ clear error)
-`pw_connect`, `pw_navigate`, `pw_snapshot`, `pw_find`, `pw_click`, `pw_type`, `pw_press`, `pw_select`, `pw_hover`, `pw_wait`, `pw_scroll`, `pw_evaluate`, `pw_console`, `pw_console_message`, `pw_network`, `pw_network_request`, `pw_emulate`, `pw_performance`, `pw_screenshot`, `pw_pdf`, `pw_close`
-
-Attach to an existing Chrome:
-```bash
-google-chrome --remote-debugging-port=9222
-# then MCP tool pw_connect { "browserURL": "http://127.0.0.1:9222" }
-# or env: CDP_BROWSER_URL=http://127.0.0.1:9222
-```
-
-#### Mailbox (Vercel warm instance ✅ ephemeral · Docker ✅)
-`mail_whoami`, `mail_register`, `mail_post`, `mail_handoff`, `mail_inbox`, `mail_read`, `mail_reply`, `mail_board`, `mail_stats`
-
-REST: `POST /api/mail/:tool` (e.g. `/api/mail/inbox`)
-
-#### Browser AI (list on Vercel ✅ · automation Docker/local ✅)
-`ai_list_providers`, `ai_open`, `ai_send_message`, `ai_extract_messages`, `ai_status`
-
-REST: `POST /api/ai/:tool`
+| `extract_*`, `meta_*`, `mail_*` (warm), `ai_list_providers`, `browser_*` | ✅ | ✅ |
+| `pw_*`, `ai_open/send/extract` | ❌ clear error | ✅ |
+| Mail file persistence | ephemeral | `MAIL_PERSIST_PATH` |
 
 ### Quick start
 ```bash
 npm install --legacy-peer-deps
 npm run dev          # http://localhost:3000
-npm run smoke        # extraction + mailbox + degrade checks
-npm run mcp:stdio    # stdio MCP server
+npm run smoke
+npm run mcp:stdio
 ```
 
-### Docker (Playwright + CDP)
+### Docker
 ```bash
 docker build -t open-browser-mcp .
-docker run --rm -p 3000:3000 -e ENABLE_PLAYWRIGHT=1 open-browser-mcp
+docker run --rm -p 3000:3000 -e ENABLE_PLAYWRIGHT=1 -e MAIL_PERSIST_PATH=/data/mailbox.json \
+  -v $(pwd)/data:/data open-browser-mcp
 ```
 
 ### Environment
-See `.env.example` for `GEMINI_API_KEY`, `CDP_BROWSER_URL` / `CDP_WS_ENDPOINT`, `PW_USER_DATA_DIR`, `DISABLE_PLAYWRIGHT`.
+See [`.env.example`](.env.example). Highlights: `GEMINI_API_KEY`, `OBMC_PROFILE`, `OBMC_ALLOWED_DOMAINS`, `OBMC_PROXY`, `OBMC_STEALTHISH`, `CDP_BROWSER_URL`, `MAIL_PERSIST_PATH`.
 
-### Vercel limits
-- SSE may cut after ~60s.
-- `pw_*` and `ai_open/send/extract` return explicit errors (no Chromium).
-- `mail_*` is in-memory and resets on cold start.
-- Set `GEMINI_API_KEY` for the in-app Gemini panel.
+### Limits
+- Vercel SSE ~60s; no Chromium; mail resets on cold start unless external store.
+- Node `fetch` does not auto-use HTTP_PROXY (proxy URL is surfaced in config for future tunneling).
+- `extract_llm` needs `GEMINI_API_KEY`.
 
 ---
 
 ## Tiếng Việt
 
 ### Đây là gì
-Ứng dụng gồm giao diện trình duyệt giả lập (React) và máy chủ MCP (Express). Agent có thể:
+Ứng dụng React + máy chủ MCP Express. Agent có thể lấy dữ liệu HTTP đa chiến lược, điều khiển Chromium/CDP, hộp thư agent, điều khiển UI AI, và bật/tắt nhóm công cụ theo profile.
 
-1. Điều khiển **trình duyệt trong app** (`browser_*`)
-2. **Trích xuất HTTP** (`extract_*`) — chạy được trên Vercel
-3. Điều khiển **Chromium thật + CDP** (`pw_*`) — cần Docker/máy local
-4. **Hộp thư agent** (`mail_*`) — lấy cảm hứng từ mailnotmilk (tạm thời trên Vercel)
-5. **Điều khiển UI AI trên trình duyệt** (`ai_*`) — browser-ai-bridge / mailnotmilk
+### Tinh hoa đã tích hợp
+- **agent-browser**: snapshot/ref, delta, proxy, allow-domains  
+- **playwright-mcp**: caps, storageState, tabs, dialogs, upload/download, route mock  
+- **chrome-devtools-mcp**: CDP, console, network, emulate, performance  
+- **github-mcp**: profile/toolsets, exclude tools, Streamable HTTP  
+- **browser-ai-bridge / mailnotmilk**: `ai_*`, `mail_*`  
+- **Firecrawl / Jina / Stagehand**: map, search, change tracking, readable, observe, LLM extract tùy chọn  
 
-### Nguồn tinh hoa
-- **chrome-devtools-mcp**: kết nối Chrome sẵn có, console, network, emulate, performance, evaluate
-- **browser-ai-bridge**: danh sách provider, mở/gửi/đọc hội thoại AI web, profile CDP
-- **mailnotmilk**: mailbox agent, handoff, board; mẫu open/extract/send AI web
-- **agent-browser / playwright-mcp / github-mcp-server**: snapshot/ref, Markdown, transport MCP
+Chi tiết: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ### Chạy nhanh
 ```bash
@@ -119,11 +100,5 @@ npm run dev
 npm run smoke
 ```
 
-### Docker
-```bash
-docker build -t open-browser-mcp .
-docker run --rm -p 3000:3000 -e ENABLE_PLAYWRIGHT=1 open-browser-mcp
-```
-
 ### Giới hạn Vercel
-Serverless: SSE có thể đứt ~60s; Playwright/`ai_*` automation không chạy (báo lỗi rõ); `mail_*` mất khi cold start. Dùng `extract_*` trên Vercel; dùng Docker khi cần `pw_*` / `ai_*`.
+Không chạy Chromium; kết nối SSE có thể cắt ~60s; mailbox mất khi cold start (dùng Docker + `MAIL_PERSIST_PATH` để bền).

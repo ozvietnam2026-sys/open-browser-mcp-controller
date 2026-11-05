@@ -1,7 +1,6 @@
 /**
  * Multi-strategy web data extraction tools (HTTP-based, Vercel-safe).
- * Inspired by vercel-labs/agent-browser `read`, microsoft/playwright-mcp structured
- * extraction patterns, and github-mcp-server toolset organization.
+ * Inspired by agent-browser, playwright-mcp, Firecrawl, Jina, Crawl4AI, Stagehand, ScrapeGraphAI.
  */
 import { McpToolDefinition } from '../../shared/browser-types.js';
 import { fetchUrl, truncate } from './http-fetch.js';
@@ -18,12 +17,19 @@ import {
 import { discoverSite, fetchRobotsTxt, fetchSitemap } from './discovery.js';
 import { crawlSite, paginateExtract } from './crawl.js';
 import { detectJsonApis } from './json-api.js';
+import { mapSite } from './map.js';
+import { searchWeb } from './search.js';
+import { trackChange } from './change-store.js';
+import { llmExtract } from './llm-extract.js';
+import { observePage } from './observe.js';
+import { cacheStats, cacheClear } from '../infra/cache.js';
+import { getConfig } from '../config.js';
 
 export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
   {
     name: 'extract_http_fetch',
     description:
-      'Fetch a URL with plain HTTP (no browser). Returns status, headers, content-type, and body text. Best first step for static pages and APIs. Works on Vercel.',
+      'Fetch a URL with plain HTTP (no browser). Returns status, headers, content-type, and body text. Respects OBMC_ALLOWED_DOMAINS / cache / rate limits. Works on Vercel.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -31,6 +37,7 @@ export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
         method: { type: 'string', description: 'HTTP method (default GET)' },
         maxBytes: { type: 'number', description: 'Max response bytes (default 2MB)' },
         timeoutMs: { type: 'number', description: 'Timeout in ms (default 20000)' },
+        ignoreCache: { type: 'boolean' },
       },
       required: ['url'],
     },
@@ -38,12 +45,13 @@ export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
   {
     name: 'extract_readable',
     description:
-      'Fetch a page and convert main content to Markdown (Readability-like). Prefers article/main content; inspired by agent-browser `read`. Works on Vercel.',
+      'Fetch a page and convert main content to Markdown (Readability-like / Jina Reader style). Works on Vercel.',
     inputSchema: {
       type: 'object',
       properties: {
         url: { type: 'string', description: 'Page URL' },
         includeHtml: { type: 'boolean', description: 'Also return cleaned HTML (default false)' },
+        ignoreCache: { type: 'boolean' },
       },
       required: ['url'],
     },
@@ -51,11 +59,11 @@ export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
   {
     name: 'extract_structured',
     description:
-      'Fetch a page and extract fields via CSS selectors + schema map. Example schema: {"title":"h1","links":{"selector":"a","attr":"href","many":true}}. Works on Vercel.',
+      'LLM-free CSS schema extract. Example schema: {"title":"h1","links":{"selector":"a","attr":"href","many":true}}. Works on Vercel.',
     inputSchema: {
       type: 'object',
       properties: {
-        url: { type: 'string', description: 'Page URL' },
+        url: { type: 'string' },
         schema: {
           type: 'object',
           description: 'Map of field name → CSS selector string or {selector, attr?, many?}',
@@ -106,21 +114,18 @@ export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
       'Fetch a page and extract OpenGraph, Twitter cards, JSON-LD, microdata, canonical, and meta tags. Works on Vercel.',
     inputSchema: {
       type: 'object',
-      properties: {
-        url: { type: 'string' },
-      },
+      properties: { url: { type: 'string' } },
       required: ['url'],
     },
   },
   {
     name: 'extract_discover',
-    description:
-      'Discover site structure via robots.txt and sitemaps (sitemap index + loc URLs). Works on Vercel.',
+    description: 'Discover site structure via robots.txt and sitemaps. Works on Vercel.',
     inputSchema: {
       type: 'object',
       properties: {
-        url: { type: 'string', description: 'Site URL or any page on the site' },
-        sitemapLimit: { type: 'number', description: 'Max URLs per sitemap (default 50)' },
+        url: { type: 'string' },
+        sitemapLimit: { type: 'number' },
       },
       required: ['url'],
     },
@@ -140,7 +145,78 @@ export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        url: { type: 'string', description: 'Direct sitemap URL' },
+        url: { type: 'string' },
+        limit: { type: 'number' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'extract_map',
+    description:
+      'Firecrawl /map inspired: discover URLs via sitemap + same-origin HTML links. Optional search ranks URLs. Works on Vercel.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        search: { type: 'string' },
+        limit: { type: 'number' },
+        includeSubdomains: { type: 'boolean' },
+        ignoreQueryParameters: { type: 'boolean' },
+        sitemapMode: { type: 'string', enum: ['include', 'skip', 'only'] },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'extract_search',
+    description:
+      'Free DuckDuckGo HTML search (no API key). Firecrawl/Jina search inspired. Works on Vercel.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string' },
+        limit: { type: 'number' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'extract_change',
+    description:
+      'Firecrawl changeTracking inspired: compare readable Markdown to last snapshot for URL+tag. Returns new|same|changed + line diff.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        tag: { type: 'string' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'extract_llm',
+    description:
+      'Optional LLM schema/prompt extract (ScrapeGraphAI / Firecrawl / Stagehand). Needs GEMINI_API_KEY; else clear fallback.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        prompt: { type: 'string' },
+        schema: { type: 'object' },
+      },
+      required: ['url'],
+    },
+  },
+  {
+    name: 'extract_observe',
+    description:
+      'Stagehand observe inspired: list actionable links/buttons/fields (HTTP heuristics). Works on Vercel.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string' },
+        instruction: { type: 'string' },
         limit: { type: 'number' },
       },
       required: ['url'],
@@ -149,14 +225,14 @@ export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
   {
     name: 'extract_crawl',
     description:
-      'Multi-page same-origin crawl with hard limits (max 20 pages). Optionally extract readable previews. Works on Vercel with short timeouts.',
+      'Multi-page same-origin crawl with hard limits (max 20 pages). Works on Vercel with short timeouts.',
     inputSchema: {
       type: 'object',
       properties: {
         url: { type: 'string' },
-        maxPages: { type: 'number', description: 'Default 5, max 20' },
-        sameOriginOnly: { type: 'boolean', description: 'Default true' },
-        delayMs: { type: 'number', description: 'Delay between requests (default 200)' },
+        maxPages: { type: 'number' },
+        sameOriginOnly: { type: 'boolean' },
+        delayMs: { type: 'number' },
         extractReadable: { type: 'boolean' },
       },
       required: ['url'],
@@ -164,19 +240,15 @@ export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
   },
   {
     name: 'extract_paginate',
-    description:
-      'Follow pagination links and collect items via CSS selectors. Works on Vercel.',
+    description: 'Follow pagination links and collect items via CSS selectors. Works on Vercel.',
     inputSchema: {
       type: 'object',
       properties: {
         url: { type: 'string' },
-        itemSelector: { type: 'string', description: 'CSS selector for each item' },
-        nextSelector: { type: 'string', description: 'CSS selector for next-page link' },
+        itemSelector: { type: 'string' },
+        nextSelector: { type: 'string' },
         maxPages: { type: 'number' },
-        fields: {
-          type: 'object',
-          description: 'Optional map of field → relative CSS selector inside each item',
-        },
+        fields: { type: 'object' },
       },
       required: ['url', 'itemSelector'],
     },
@@ -184,11 +256,21 @@ export const MCP_EXTRACT_TOOLS: McpToolDefinition[] = [
   {
     name: 'extract_json_api',
     description:
-      'Detect JSON APIs: direct JSON responses, __NEXT_DATA__, linked .json/api endpoints, and common probes. Works on Vercel.',
+      'Detect JSON APIs: direct JSON, __NEXT_DATA__, linked .json/api endpoints, probes. Works on Vercel.',
     inputSchema: {
       type: 'object',
       properties: { url: { type: 'string' } },
       required: ['url'],
+    },
+  },
+  {
+    name: 'extract_cache',
+    description: 'Inspect or clear the HTTP extraction cache.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['stats', 'clear'] },
+      },
     },
   },
 ];
@@ -206,14 +288,12 @@ export async function executeExtractTool(name: string, args: Record<string, any>
         method: args.method,
         maxBytes: args.maxBytes,
         timeoutMs: args.timeoutMs,
+        ignoreCache: args.ignoreCache,
       });
-      return ok({
-        ...res,
-        bodyText: truncate(res.bodyText, 40_000),
-      });
+      return ok({ ...res, bodyText: truncate(res.bodyText, 40_000) });
     }
     case 'extract_readable': {
-      const res = await fetchUrl(args.url);
+      const res = await fetchUrl(args.url, { ignoreCache: args.ignoreCache });
       const $ = loadHtml(res.bodyText);
       const readable = extractReadable($, res.finalUrl);
       const out: any = {
@@ -224,6 +304,7 @@ export async function executeExtractTool(name: string, args: Record<string, any>
         excerpt: readable.excerpt,
         wordCount: readable.wordCount,
         markdown: readable.contentMarkdown,
+        fromCache: res.fromCache,
       };
       if (args.includeHtml) out.html = readable.contentHtml.slice(0, 50_000);
       return ok(out);
@@ -265,6 +346,39 @@ export async function executeExtractTool(name: string, args: Record<string, any>
       return ok(await fetchRobotsTxt(args.url));
     case 'extract_sitemap':
       return ok(await fetchSitemap(args.url, args.limit ?? 100));
+    case 'extract_map':
+      return ok(
+        await mapSite({
+          url: args.url,
+          search: args.search,
+          limit: args.limit,
+          includeSubdomains: args.includeSubdomains,
+          ignoreQueryParameters: args.ignoreQueryParameters,
+          sitemapMode: args.sitemapMode,
+        })
+      );
+    case 'extract_search':
+      return ok(await searchWeb({ query: args.query, limit: args.limit }));
+    case 'extract_change': {
+      const res = await fetchUrl(args.url, { ignoreCache: true });
+      const $ = loadHtml(res.bodyText);
+      const readable = extractReadable($, res.finalUrl);
+      const change = trackChange({
+        url: res.finalUrl,
+        markdown: readable.contentMarkdown || '',
+        tag: args.tag,
+      });
+      return ok({
+        url: res.finalUrl,
+        title: readable.title,
+        wordCount: readable.wordCount,
+        ...change,
+      });
+    }
+    case 'extract_llm':
+      return ok(await llmExtract({ url: args.url, prompt: args.prompt, schema: args.schema }));
+    case 'extract_observe':
+      return ok(await observePage({ url: args.url, instruction: args.instruction, limit: args.limit }));
     case 'extract_crawl':
       return ok(
         await crawlSite({
@@ -287,6 +401,13 @@ export async function executeExtractTool(name: string, args: Record<string, any>
       );
     case 'extract_json_api':
       return ok(await detectJsonApis(args.url));
+    case 'extract_cache': {
+      if (args.action === 'clear') {
+        cacheClear();
+        return ok({ ok: true, cleared: true, config: { ttl: getConfig().cacheTtlSec } });
+      }
+      return ok({ ...cacheStats(), ttlSec: getConfig().cacheTtlSec, enabled: getConfig().cacheEnabled });
+    }
     default:
       throw new Error(`Unknown extract tool: ${name}`);
   }
