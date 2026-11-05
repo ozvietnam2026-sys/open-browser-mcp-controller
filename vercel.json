@@ -1,0 +1,12 @@
+{
+  "framework": "vite",
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "functions": { "api/index.mjs": { "maxDuration": 60 } },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index.mjs" },
+    { "source": "/mcp/(.*)", "destination": "/api/index.mjs" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
