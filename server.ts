@@ -9,7 +9,9 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { browserState } from './server/browser-state.js';
-import { McpServerHandler, MCP_BROWSER_TOOLS } from './server/mcp-server.js';
+import { McpServerHandler, MCP_BROWSER_TOOLS, ALL_MCP_TOOLS } from './server/mcp-server.js';
+import { executeExtractTool, EXTRACT_TOOL_NAMES } from './server/extract/index.js';
+import { executePlaywrightTool, PLAYWRIGHT_TOOL_NAMES } from './server/playwright/tools.js';
 import { ProxyEngine } from './server/proxy-engine.js';
 import { GeminiBrowserAgent } from './server/gemini-agent.js';
 
@@ -62,10 +64,74 @@ app.post('/api/mcp/rpc', (req: Request, res: Response) => {
   McpServerHandler.handleDirectRpc(req, res);
 });
 
+// Streamable HTTP MCP endpoint (GitHub MCP style single /mcp URL)
+// Accepts JSON-RPC over POST; also supports simple GET discovery.
+app.all('/mcp', async (req: Request, res: Response) => {
+  if (req.method === 'GET') {
+    return res.json({
+      protocol: 'mcp',
+      transport: 'streamable-http',
+      endpoints: {
+        rpc: '/mcp',
+        sse: '/mcp/sse',
+        messages: '/mcp/messages',
+        legacyRpc: '/api/mcp/rpc',
+      },
+      tools: ALL_MCP_TOOLS.length,
+    });
+  }
+  if (req.method === 'POST') {
+    const body = req.body;
+    // notifications have no id — still process
+    const response = await McpServerHandler.processRpcMessage(body);
+    // If client Accept prefers SSE and this is a long tool call, we still return JSON for serverless compatibility
+    return res.json(response);
+  }
+  res.setHeader('Allow', 'GET, POST');
+  return res.status(405).json({ error: 'Method not allowed' });
+});
+
+// Convenience REST wrappers for HTTP extraction (handy for curl / smoke tests)
+app.post('/api/extract/:tool', async (req: Request, res: Response) => {
+  const tool = `extract_${req.params.tool}`;
+  if (!EXTRACT_TOOL_NAMES.has(tool)) {
+    return res.status(404).json({ error: `Unknown extract tool: ${tool}`, available: [...EXTRACT_TOOL_NAMES] });
+  }
+  try {
+    const result = await executeExtractTool(tool, req.body || {});
+    const text = result?.content?.[0]?.text;
+    let data: any = text;
+    try { data = JSON.parse(text); } catch { /* keep text */ }
+    return res.json({ ok: true, tool, data });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, tool, error: err?.message || String(err) });
+  }
+});
+
+app.get('/api/extract/health', (_req: Request, res: Response) => {
+  res.json({
+    ok: true,
+    extractTools: [...EXTRACT_TOOL_NAMES],
+    playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
+    playwrightEnabled: !process.env.VERCEL && process.env.DISABLE_PLAYWRIGHT !== '1',
+    platform: process.env.VERCEL ? 'vercel-serverless' : 'long-running',
+  });
+});
+
 // MCP Tools schema list
 app.get('/api/mcp/tools', (_req: Request, res: Response) => {
   res.json({
-    tools: MCP_BROWSER_TOOLS,
+    tools: ALL_MCP_TOOLS,
+    groups: {
+      browser: MCP_BROWSER_TOOLS.map((t) => t.name),
+      extract: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('extract_')).map((t) => t.name),
+      playwright: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('pw_')).map((t) => t.name),
+    },
+    notes: {
+      extract: 'HTTP-based extraction — works on Vercel serverless',
+      playwright: 'Real Chromium — requires Docker/long-running host; degrades with clear error on Vercel',
+      browser: 'Simulated in-app browser driven by the UI',
+    },
   });
 });
 
@@ -93,6 +159,12 @@ app.get('/api/mcp/config', (req: Request, res: Response) => {
           url: `${baseUrl}/mcp/sse`,
         },
       },
+    },
+    streamableHttpEndpoint: `${baseUrl}/mcp`,
+    stdio: {
+      command: 'npx',
+      args: ['tsx', 'scripts/mcp-stdio.ts'],
+      note: 'Run from project root on a long-running host',
     },
   });
 });

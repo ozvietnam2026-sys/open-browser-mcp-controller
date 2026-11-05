@@ -123,6 +123,81 @@ export const McpHubPanel: React.FC<McpHubPanelProps> = ({ onClose, activeTabId }
       case 'browser_history':
         sampleArgs = { action: 'back' };
         break;
+      case 'extract_http_fetch':
+        sampleArgs = { url: 'https://example.com' };
+        break;
+      case 'extract_readable':
+        sampleArgs = { url: 'https://en.wikipedia.org/wiki/Web_scraping' };
+        break;
+      case 'extract_structured':
+        sampleArgs = {
+          url: 'https://example.com',
+          schema: { title: 'h1', links: { selector: 'a', attr: 'href', many: true } },
+        };
+        break;
+      case 'extract_tables':
+        sampleArgs = { url: 'https://en.wikipedia.org/wiki/List_of_HTTP_status_codes', limit: 5 };
+        break;
+      case 'extract_lists':
+        sampleArgs = { url: 'https://example.com', limit: 10 };
+        break;
+      case 'extract_links':
+        sampleArgs = { url: 'https://news.ycombinator.com', limit: 20 };
+        break;
+      case 'extract_metadata':
+        sampleArgs = { url: 'https://en.wikipedia.org/wiki/Web_scraping' };
+        break;
+      case 'extract_discover':
+        sampleArgs = { url: 'https://www.wikipedia.org', sitemapLimit: 20 };
+        break;
+      case 'extract_robots':
+        sampleArgs = { url: 'https://www.wikipedia.org' };
+        break;
+      case 'extract_sitemap':
+        sampleArgs = { url: 'https://www.wikipedia.org/sitemap.xml', limit: 20 };
+        break;
+      case 'extract_crawl':
+        sampleArgs = { url: 'https://example.com', maxPages: 3, extractReadable: true };
+        break;
+      case 'extract_paginate':
+        sampleArgs = {
+          url: 'https://news.ycombinator.com',
+          itemSelector: 'tr.athing',
+          nextSelector: 'a.morelink',
+          maxPages: 2,
+          fields: { title: '.titleline a' },
+        };
+        break;
+      case 'extract_json_api':
+        sampleArgs = { url: 'https://example.com' };
+        break;
+      case 'pw_navigate':
+        sampleArgs = { url: 'https://example.com' };
+        break;
+      case 'pw_snapshot':
+        sampleArgs = { interactiveOnly: true };
+        break;
+      case 'pw_click':
+        sampleArgs = { ref: 'e1' };
+        break;
+      case 'pw_type':
+        sampleArgs = { ref: 'e1', text: 'hello' };
+        break;
+      case 'pw_network':
+        sampleArgs = { all: false };
+        break;
+      case 'pw_screenshot':
+        sampleArgs = { fullPage: false };
+        break;
+      case 'pw_pdf':
+        sampleArgs = {};
+        break;
+      case 'pw_scroll':
+        sampleArgs = { infiniteSteps: 3, waitMs: 500 };
+        break;
+      case 'pw_close':
+        sampleArgs = {};
+        break;
       default:
         sampleArgs = {};
     }
