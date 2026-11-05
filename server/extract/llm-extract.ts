@@ -8,10 +8,10 @@ import { loadHtml, extractReadable, visibleText } from './parse-html.js';
 
 const MODEL_CASCADE = [
   process.env.GEMINI_MODEL,
+  'gemini-3.5-flash',
+  'gemini-flash-lite-latest',
   'gemini-3.8-flash',
   'gemini-3.7-flash',
-  'gemini-3.5-flash',
-  'gemini-2.5-flash',
   'gemini-flash-latest',
 ].filter(Boolean) as string[];
 
@@ -65,7 +65,10 @@ export async function llmExtract(opts: {
         const msg = json?.error?.message || JSON.stringify(json).slice(0, 300);
         errors.push(`${model}:${r.status}:${msg}`);
         // Retry next model on unavailable / rate / not found
-        if ([404, 429, 500, 503].includes(r.status)) continue;
+        if ([404, 429, 500, 503].includes(r.status)) {
+          await new Promise((r) => setTimeout(r, 400));
+          continue;
+        }
         return { ok: false, status: r.status, error: msg, tried, model };
       }
       const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';

@@ -90,7 +90,7 @@ export function getConfig(): AppConfig {
   const caps = runtimeCapsOverride || envCaps || profileCaps;
 
   return {
-    version: '4.1.1',
+    version: '4.1.2',
     userAgent:
       process.env.OBMC_USER_AGENT ||
       process.env.AGENT_BROWSER_USER_AGENT ||

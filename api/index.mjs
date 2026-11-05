@@ -25228,7 +25228,7 @@ function getConfig() {
   const envCaps = parseCaps(process.env.MCP_CAPS || process.env.OBMC_CAPS || process.env.PLAYWRIGHT_MCP_CAPS);
   const caps = runtimeCapsOverride || envCaps || profileCaps;
   return {
-    version: "4.1.1",
+    version: "4.1.2",
     userAgent: process.env.OBMC_USER_AGENT || process.env.AGENT_BROWSER_USER_AGENT || "OpenBrowserMCP/4.1 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller; research bot)",
     proxyUrl: process.env.OBMC_PROXY || process.env.AGENT_BROWSER_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || void 0,
     proxyBypass: parseList(process.env.OBMC_PROXY_BYPASS || process.env.AGENT_BROWSER_PROXY_BYPASS || process.env.NO_PROXY),
@@ -72653,7 +72653,10 @@ ${text3}` }]
       if (!r2.ok) {
         const msg = json?.error?.message || JSON.stringify(json).slice(0, 300);
         errors2.push(`${model}:${r2.status}:${msg}`);
-        if ([404, 429, 500, 503].includes(r2.status)) continue;
+        if ([404, 429, 500, 503].includes(r2.status)) {
+          await new Promise((r3) => setTimeout(r3, 400));
+          continue;
+        }
         return { ok: false, status: r2.status, error: msg, tried, model };
       }
       const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
@@ -72683,10 +72686,10 @@ var init_llm_extract = __esm({
     init_parse_html();
     MODEL_CASCADE = [
       process.env.GEMINI_MODEL,
+      "gemini-3.5-flash",
+      "gemini-flash-lite-latest",
       "gemini-3.8-flash",
       "gemini-3.7-flash",
-      "gemini-3.5-flash",
-      "gemini-2.5-flash",
       "gemini-flash-latest"
     ].filter(Boolean);
   }
@@ -117180,10 +117183,10 @@ var GeminiBrowserAgent = class {
     const steps = [];
     const AGENT_MODEL_CASCADE = [
       process.env.GEMINI_MODEL,
+      "gemini-3.5-flash",
+      "gemini-flash-lite-latest",
       "gemini-3.8-flash",
       "gemini-3.7-flash",
-      "gemini-3.5-flash",
-      "gemini-2.5-flash",
       "gemini-flash-latest"
     ].filter(Boolean);
     async function generateWithCascade(ai2, args) {
@@ -117578,7 +117581,7 @@ app.post("/api/extract/:tool", async (req, res) => {
 app.get("/api/extract/health", (_req, res) => {
   res.json({
     ok: true,
-    version: "4.1.1",
+    version: "4.1.2",
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],

@@ -29,10 +29,10 @@ export class GeminiBrowserAgent {
     const steps: AgentStep[] = [];
     const AGENT_MODEL_CASCADE = [
   process.env.GEMINI_MODEL,
+  'gemini-3.5-flash',
+  'gemini-flash-lite-latest',
   'gemini-3.8-flash',
   'gemini-3.7-flash',
-  'gemini-3.5-flash',
-  'gemini-2.5-flash',
   'gemini-flash-latest',
 ].filter(Boolean) as string[];
 
