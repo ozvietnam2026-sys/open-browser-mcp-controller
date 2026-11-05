@@ -12,6 +12,8 @@ import { browserState } from './server/browser-state.js';
 import { McpServerHandler, MCP_BROWSER_TOOLS, ALL_MCP_TOOLS } from './server/mcp-server.js';
 import { executeExtractTool, EXTRACT_TOOL_NAMES } from './server/extract/index.js';
 import { executePlaywrightTool, PLAYWRIGHT_TOOL_NAMES } from './server/playwright/tools.js';
+import { executeMailTool, MAIL_TOOL_NAMES } from './server/mailbox/index.js';
+import { executeAiWebTool, AI_WEB_TOOL_NAMES } from './server/ai-web/index.js';
 import { ProxyEngine } from './server/proxy-engine.js';
 import { GeminiBrowserAgent } from './server/gemini-agent.js';
 
@@ -111,11 +113,55 @@ app.post('/api/extract/:tool', async (req: Request, res: Response) => {
 app.get('/api/extract/health', (_req: Request, res: Response) => {
   res.json({
     ok: true,
+    version: '3.1.0',
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
+    mailTools: [...MAIL_TOOL_NAMES],
+    aiWebTools: [...AI_WEB_TOOL_NAMES],
     playwrightEnabled: !process.env.VERCEL && process.env.DISABLE_PLAYWRIGHT !== '1',
     platform: process.env.VERCEL ? 'vercel-serverless' : 'long-running',
+    inspirations: [
+      'ChromeDevTools/chrome-devtools-mcp',
+      'jeffrey-nz/browser-ai-bridge',
+      'jrb00013/mailnotmilk',
+      'vercel-labs/agent-browser',
+      'microsoft/playwright-mcp',
+    ],
   });
+});
+
+
+// Mailbox REST (mailnotmilk-inspired; ephemeral on serverless)
+app.post('/api/mail/:tool', async (req: Request, res: Response) => {
+  const tool = `mail_${req.params.tool}`;
+  if (!MAIL_TOOL_NAMES.has(tool)) {
+    return res.status(404).json({ error: `Unknown mail tool: ${tool}`, available: [...MAIL_TOOL_NAMES] });
+  }
+  try {
+    const result = await executeMailTool(tool, req.body || {});
+    const textBody = result?.content?.[0]?.text;
+    let data: any = textBody;
+    try { data = JSON.parse(textBody); } catch { /* keep */ }
+    return res.json({ ok: true, tool, data });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, tool, error: err?.message || String(err) });
+  }
+});
+
+app.post('/api/ai/:tool', async (req: Request, res: Response) => {
+  const tool = `ai_${req.params.tool}`;
+  if (!AI_WEB_TOOL_NAMES.has(tool)) {
+    return res.status(404).json({ error: `Unknown ai tool: ${tool}`, available: [...AI_WEB_TOOL_NAMES] });
+  }
+  try {
+    const result = await executeAiWebTool(tool, req.body || {});
+    const textBody = result?.content?.[0]?.text;
+    let data: any = textBody;
+    try { data = JSON.parse(textBody); } catch { /* keep */ }
+    return res.json({ ok: true, tool, data });
+  } catch (err: any) {
+    return res.status(500).json({ ok: false, tool, error: err?.message || String(err) });
+  }
 });
 
 // MCP Tools schema list
@@ -126,11 +172,15 @@ app.get('/api/mcp/tools', (_req: Request, res: Response) => {
       browser: MCP_BROWSER_TOOLS.map((t) => t.name),
       extract: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('extract_')).map((t) => t.name),
       playwright: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('pw_')).map((t) => t.name),
+      mail: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('mail_')).map((t) => t.name),
+      aiWeb: ALL_MCP_TOOLS.filter((t) => t.name.startsWith('ai_')).map((t) => t.name),
     },
     notes: {
       extract: 'HTTP-based extraction — works on Vercel serverless',
-      playwright: 'Real Chromium — requires Docker/long-running host; degrades with clear error on Vercel',
+      playwright: 'Real Chromium + CDP connect/console/network/emulate/performance — Docker/local; clear error on Vercel',
       browser: 'Simulated in-app browser driven by the UI',
+      mail: 'In-memory agent mailbox (mailnotmilk-inspired) — works on Vercel warm instance (ephemeral)',
+      aiWeb: 'Drive logged-in browser AI UIs (browser-ai-bridge / mailnotmilk) — Docker/local only',
     },
   });
 });

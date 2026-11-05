@@ -97,7 +97,7 @@ export class McpServerHandler {
               protocolVersion: '2024-11-05',
               serverInfo: {
                 name: 'open-browser-mcp-server',
-                version: '3.0.0',
+                version: '3.1.0',
               },
               capabilities: {
                 tools: {

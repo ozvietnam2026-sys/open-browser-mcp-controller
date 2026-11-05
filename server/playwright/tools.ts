@@ -5,12 +5,36 @@ import {
   getPage,
   buildA11ySnapshot,
   resolveRef,
+  findInSnapshot,
   getNetworkLog,
+  getNetworkRequest,
   clearNetworkLog,
+  getConsoleLog,
+  getConsoleMessage,
+  clearConsoleLog,
   closePlaywright,
+  connectOverCdp,
+  getConnectionMode,
+  applyEmulation,
+  collectPerformanceMetrics,
+  startPerformanceTrace,
+  stopPerformanceTrace,
+  evaluateScript,
 } from './runtime.js';
 
 export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
+  {
+    name: 'pw_connect',
+    description:
+      'Playwright/CDP: connect to an existing debuggable Chrome (chrome-devtools-mcp --browserUrl / --wsEndpoint). Example browserURL http://127.0.0.1:9222. Docker/local only.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        browserURL: { type: 'string', description: 'http://127.0.0.1:9222' },
+        wsEndpoint: { type: 'string', description: 'ws://…/devtools/browser/<id>' },
+      },
+    },
+  },
   {
     name: 'pw_navigate',
     description:
@@ -27,18 +51,33 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
   {
     name: 'pw_snapshot',
     description:
-      'Playwright: accessibility snapshot with element refs (e1, e2…) like microsoft/playwright-mcp and agent-browser. Use refs with pw_click/pw_type.',
+      'Playwright: accessibility snapshot with element refs (e1, e2…) like playwright-mcp, agent-browser, and chrome-devtools take_snapshot. Use refs with pw_click/pw_type.',
     inputSchema: {
       type: 'object',
       properties: {
         interactiveOnly: { type: 'boolean', description: 'Default true' },
         maxNodes: { type: 'number' },
+        maxDepth: { type: 'number' },
+      },
+    },
+  },
+  {
+    name: 'pw_find',
+    description:
+      'Find refs in the last pw_snapshot by role and/or name/text (P0 snapshot/ref standardization). Call pw_snapshot first.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        role: { type: 'string', description: 'e.g. button, link, textbox' },
+        name: { type: 'string', description: 'Substring match on accessible name' },
+        text: { type: 'string', description: 'Alias of name' },
+        limit: { type: 'number' },
       },
     },
   },
   {
     name: 'pw_click',
-    description: 'Playwright: click by ref from pw_snapshot (e.g. "e5") or a selector.',
+    description: 'Playwright: click by ref from pw_snapshot (e.g. "e5") or a selector. Auto-snapshots after click.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -63,14 +102,124 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
     },
   },
   {
+    name: 'pw_hover',
+    description: 'Playwright: hover by ref or selector (chrome-devtools hover).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        ref: { type: 'string' },
+        selector: { type: 'string' },
+      },
+    },
+  },
+  {
+    name: 'pw_press',
+    description: 'Playwright: press a key (Enter, Tab, Escape, Control+a…).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        key: { type: 'string' },
+        ref: { type: 'string' },
+        selector: { type: 'string' },
+      },
+      required: ['key'],
+    },
+  },
+  {
+    name: 'pw_wait',
+    description: 'Wait for selector, text, timeout, or URL substring.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        selector: { type: 'string' },
+        text: { type: 'string' },
+        urlIncludes: { type: 'string' },
+        timeoutMs: { type: 'number' },
+      },
+    },
+  },
+  {
     name: 'pw_network',
-    description: 'Playwright: list captured network/XHR requests for the current page.',
+    description: 'List captured network/XHR requests (chrome-devtools list_network_requests).',
     inputSchema: {
       type: 'object',
       properties: {
         clear: { type: 'boolean', description: 'Clear log after read' },
         all: { type: 'boolean' },
+        resourceType: { type: 'string', description: 'Filter e.g. xhr, fetch, document' },
       },
+    },
+  },
+  {
+    name: 'pw_network_request',
+    description: 'Get one network request by id including headers/postData (chrome-devtools get_network_request).',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'number' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'pw_console',
+    description: 'List browser console messages + page errors (chrome-devtools list_console_messages).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        type: { type: 'string', description: 'Filter: log|error|warning|info|debug' },
+        clear: { type: 'boolean' },
+        all: { type: 'boolean' },
+      },
+    },
+  },
+  {
+    name: 'pw_console_message',
+    description: 'Get one console message by id (chrome-devtools get_console_message).',
+    inputSchema: {
+      type: 'object',
+      properties: { id: { type: 'number' } },
+      required: ['id'],
+    },
+  },
+  {
+    name: 'pw_emulate',
+    description:
+      'Emulate viewport, colorScheme, geolocation, offline, extra headers (chrome-devtools emulate / resize_page).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        width: { type: 'number' },
+        height: { type: 'number' },
+        colorScheme: { type: 'string', enum: ['light', 'dark', 'no-preference'] },
+        offline: { type: 'boolean' },
+        latitude: { type: 'number' },
+        longitude: { type: 'number' },
+        userAgent: { type: 'string' },
+        extraHTTPHeaders: { type: 'object' },
+      },
+    },
+  },
+  {
+    name: 'pw_performance',
+    description:
+      'Collect lab performance metrics (Navigation Timing, paint, LCP, CDP Performance.getMetrics). Inspired by chrome-devtools performance_* tools.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        action: {
+          type: 'string',
+          enum: ['metrics', 'start_trace', 'stop_trace'],
+          description: 'Default metrics',
+        },
+      },
+    },
+  },
+  {
+    name: 'pw_evaluate',
+    description: 'Evaluate JavaScript in the page via CDP Runtime.evaluate (chrome-devtools evaluate_script).',
+    inputSchema: {
+      type: 'object',
+      properties: { script: { type: 'string' } },
+      required: ['script'],
     },
   },
   {
@@ -78,9 +227,7 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
     description: 'Playwright: capture PNG screenshot (base64).',
     inputSchema: {
       type: 'object',
-      properties: {
-        fullPage: { type: 'boolean' },
-      },
+      properties: { fullPage: { type: 'boolean' } },
     },
   },
   {
@@ -88,9 +235,7 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
     description: 'Playwright: render current page to PDF (base64). Chromium only.',
     inputSchema: {
       type: 'object',
-      properties: {
-        landscape: { type: 'boolean' },
-      },
+      properties: { landscape: { type: 'boolean' } },
     },
   },
   {
@@ -101,14 +246,19 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
       properties: {
         direction: { type: 'string', enum: ['down', 'up', 'top', 'bottom'] },
         amount: { type: 'number' },
-        infiniteSteps: { type: 'number', description: 'If set, perform N infinite-scroll steps' },
+        infiniteSteps: { type: 'number' },
         waitMs: { type: 'number' },
       },
     },
   },
   {
+    name: 'pw_status',
+    description: 'Show Playwright connection mode (launch|cdp|persistent) and current page URL.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'pw_close',
-    description: 'Playwright: close browser session and free resources.',
+    description: 'Close Playwright session. For CDP mode, detaches without quitting the user Chrome.',
     inputSchema: { type: 'object', properties: {} },
   },
 ];
@@ -137,6 +287,13 @@ async function guard(tool: string, fn: () => Promise<any>) {
 export async function executePlaywrightTool(name: string, args: Record<string, any>): Promise<any> {
   return guard(name, async () => {
     switch (name) {
+      case 'pw_connect': {
+        const info = await connectOverCdp({
+          browserURL: args.browserURL,
+          wsEndpoint: args.wsEndpoint,
+        });
+        return textResult(JSON.stringify({ ok: true, ...info }, null, 2));
+      }
       case 'pw_navigate': {
         const p = await getPage();
         await p.goto(args.url, { waitUntil: args.waitUntil || 'domcontentloaded', timeout: 45000 });
@@ -149,10 +306,20 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
         const snap = await buildA11ySnapshot({
           interactiveOnly: args.interactiveOnly !== false,
           maxNodes: args.maxNodes,
+          maxDepth: args.maxDepth,
         });
         return textResult(
           `URL: ${snap.url}\nTitle: ${snap.title}\nRefs: ${snap.refs}\n\n${snap.snapshot}`
         );
+      }
+      case 'pw_find': {
+        const hits = findInSnapshot({
+          role: args.role,
+          name: args.name,
+          text: args.text,
+          limit: args.limit,
+        });
+        return textResult(JSON.stringify({ count: hits.length, hits }, null, 2));
       }
       case 'pw_click': {
         const p = await getPage();
@@ -172,10 +339,96 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
         if (args.pressEnter) await loc.press('Enter');
         return textResult(`Typed into ${args.ref || args.selector}`);
       }
+      case 'pw_hover': {
+        const p = await getPage();
+        const target = args.ref ? resolveRef(args.ref) : args.selector;
+        if (!target) throw new Error('Provide ref or selector');
+        await p.locator(target).first().hover({ timeout: 15000 });
+        return textResult(`Hovered ${args.ref || args.selector}`);
+      }
+      case 'pw_press': {
+        const p = await getPage();
+        if (args.ref || args.selector) {
+          const target = args.ref ? resolveRef(args.ref) : args.selector;
+          await p.locator(target).first().press(args.key, { timeout: 15000 });
+        } else {
+          await p.keyboard.press(args.key);
+        }
+        return textResult(`Pressed ${args.key}`);
+      }
+      case 'pw_wait': {
+        const p = await getPage();
+        const timeout = args.timeoutMs ?? 15000;
+        if (args.selector) await p.waitForSelector(args.selector, { timeout });
+        else if (args.text) await p.getByText(args.text).first().waitFor({ timeout });
+        else if (args.urlIncludes) {
+          await p.waitForFunction(
+            (s) => location.href.includes(s),
+            args.urlIncludes,
+            { timeout }
+          );
+        } else await p.waitForTimeout(Math.min(timeout, 10000));
+        return textResult(`Wait done. URL=${p.url()}`);
+      }
       case 'pw_network': {
-        const logs = getNetworkLog(!!args.all);
+        let logs = getNetworkLog(!!args.all);
+        if (args.resourceType) {
+          logs = logs.filter((e) => e.resourceType === args.resourceType);
+        }
         if (args.clear) clearNetworkLog();
-        return textResult(JSON.stringify({ count: logs.length, requests: logs }, null, 2));
+        const slim = logs.map(({ id, method, url, status, resourceType, timestamp }) => ({
+          id,
+          method,
+          url,
+          status,
+          resourceType,
+          timestamp,
+        }));
+        return textResult(JSON.stringify({ count: slim.length, requests: slim }, null, 2));
+      }
+      case 'pw_network_request': {
+        const entry = getNetworkRequest(Number(args.id));
+        if (!entry) throw new Error(`No network request id=${args.id}`);
+        return textResult(JSON.stringify(entry, null, 2));
+      }
+      case 'pw_console': {
+        const logs = getConsoleLog({ type: args.type, all: !!args.all });
+        if (args.clear) clearConsoleLog();
+        return textResult(JSON.stringify({ count: logs.length, messages: logs }, null, 2));
+      }
+      case 'pw_console_message': {
+        const msg = getConsoleMessage(Number(args.id));
+        if (!msg) throw new Error(`No console message id=${args.id}`);
+        return textResult(JSON.stringify(msg, null, 2));
+      }
+      case 'pw_emulate': {
+        const result = await applyEmulation({
+          viewport:
+            args.width && args.height ? { width: args.width, height: args.height } : undefined,
+          colorScheme: args.colorScheme,
+          offline: args.offline,
+          geolocation:
+            args.latitude != null && args.longitude != null
+              ? { latitude: args.latitude, longitude: args.longitude }
+              : undefined,
+          userAgent: args.userAgent,
+          extraHTTPHeaders: args.extraHTTPHeaders,
+        });
+        return textResult(JSON.stringify(result, null, 2));
+      }
+      case 'pw_performance': {
+        const action = args.action || 'metrics';
+        if (action === 'start_trace') {
+          return textResult(JSON.stringify(await startPerformanceTrace(), null, 2));
+        }
+        if (action === 'stop_trace') {
+          return textResult(JSON.stringify(await stopPerformanceTrace(), null, 2));
+        }
+        return textResult(JSON.stringify(await collectPerformanceMetrics(), null, 2));
+      }
+      case 'pw_evaluate': {
+        const value = await evaluateScript(args.script);
+        return textResult(JSON.stringify({ result: value }, null, 2));
       }
       case 'pw_screenshot': {
         const p = await getPage();
@@ -196,7 +449,10 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
               type: 'text',
               text: `PDF generated (${buf.byteLength} bytes). Base64 follows as resource text for transfer.`,
             },
-            { type: 'text', text: `data:application/pdf;base64,${buf.toString('base64').slice(0, 200)}…[truncated base64]` },
+            {
+              type: 'text',
+              text: `data:application/pdf;base64,${buf.toString('base64').slice(0, 200)}…[truncated base64]`,
+            },
           ],
         };
       }
@@ -221,9 +477,33 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
         else await p.evaluate((a) => window.scrollBy(0, a), amount);
         return textResult(`Scrolled ${dir}`);
       }
+      case 'pw_status': {
+        let url = '';
+        let title = '';
+        try {
+          const p = await getPage();
+          url = p.url();
+          title = await p.title();
+        } catch {
+          /* no page yet */
+        }
+        return textResult(
+          JSON.stringify(
+            {
+              mode: getConnectionMode(),
+              available: playwrightAvailable(),
+              url,
+              title,
+              platform: process.env.VERCEL ? 'vercel' : 'long-running',
+            },
+            null,
+            2
+          )
+        );
+      }
       case 'pw_close': {
         await closePlaywright();
-        return textResult('Playwright browser closed.');
+        return textResult('Playwright browser closed / CDP detached.');
       }
       default:
         throw new Error(`Unknown playwright tool: ${name}`);

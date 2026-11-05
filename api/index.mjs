@@ -23207,7 +23207,7 @@ var require_cookie = __commonJS({
   "node_modules/cookie/index.js"(exports) {
     "use strict";
     exports.parse = parse8;
-    exports.serialize = serialize3;
+    exports.serialize = serialize4;
     var __toString = Object.prototype.toString;
     var __hasOwnProperty = Object.prototype.hasOwnProperty;
     var cookieNameRegExp = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
@@ -23266,7 +23266,7 @@ var require_cookie = __commonJS({
       }
       return min;
     }
-    function serialize3(name, val2, opt) {
+    function serialize4(name, val2, opt) {
       var enc = opt && opt.encode || encodeURIComponent;
       if (typeof enc !== "function") {
         throw new TypeError("option encode is invalid");
@@ -23827,7 +23827,7 @@ var require_response = __commonJS({
       this.append("Set-Cookie", cookie.serialize(name, String(val2), opts));
       return this;
     };
-    res.location = function location(url) {
+    res.location = function location2(url) {
       var loc;
       if (url === "back") {
         deprecate3('res.location("back"): use res.location(req.get("Referrer") || "/") and refer to https://dub.sh/security-redirect for best practices');
@@ -34294,17 +34294,17 @@ var require_util2 = __commonJS({
       if (!redirectStatusSet.has(response.status)) {
         return null;
       }
-      let location = response.headersList.get("location", true);
-      if (location !== null && isValidHeaderValue(location)) {
-        if (!isValidEncodedURL(location)) {
-          location = normalizeBinaryStringToUtf8(location);
+      let location2 = response.headersList.get("location", true);
+      if (location2 !== null && isValidHeaderValue(location2)) {
+        if (!isValidEncodedURL(location2)) {
+          location2 = normalizeBinaryStringToUtf8(location2);
         }
-        location = new URL(location, responseURL(response));
+        location2 = new URL(location2, responseURL(response));
       }
-      if (location && !location.hash) {
-        location.hash = requestFragment;
+      if (location2 && !location2.hash) {
+        location2.hash = requestFragment;
       }
-      return location;
+      return location2;
     }
     function isValidEncodedURL(url) {
       for (let i2 = 0; i2 < url.length; ++i2) {
@@ -39291,7 +39291,7 @@ var require_socks5_utils = __commonJS({
       };
     }
     function createReplyError(replyCode) {
-      const messages = {
+      const messages2 = {
         1: "General SOCKS server failure",
         2: "Connection not allowed by ruleset",
         3: "Network unreachable",
@@ -39301,7 +39301,7 @@ var require_socks5_utils = __commonJS({
         7: "Command not supported",
         8: "Address type not supported"
       };
-      const message = messages[replyCode] || `Unknown SOCKS5 error code: ${replyCode}`;
+      const message = messages2[replyCode] || `Unknown SOCKS5 error code: ${replyCode}`;
       const error = new Error(message);
       error.code = `SOCKS5_${replyCode}`;
       return error;
@@ -45772,8 +45772,8 @@ var require_cache_handler = __commonJS({
         }
       }
     }
-    function getSameOriginPath(cacheKey, location) {
-      if (typeof location !== "string") {
+    function getSameOriginPath(cacheKey, location2) {
+      if (typeof location2 !== "string") {
         return void 0;
       }
       let originUrl;
@@ -45782,7 +45782,7 @@ var require_cache_handler = __commonJS({
       try {
         originUrl = new URL(cacheKey.origin);
         requestUrl = new URL(cacheKey.path, originUrl);
-        locationUrl = new URL(location, requestUrl);
+        locationUrl = new URL(location2, requestUrl);
       } catch {
         return void 0;
       }
@@ -48682,8 +48682,8 @@ var require_headers = __commonJS({
       static getHeadersGuard(o) {
         return o.#guard;
       }
-      static setHeadersGuard(o, guard2) {
-        o.#guard = guard2;
+      static setHeadersGuard(o, guard3) {
+        o.#guard = guard3;
       }
       /**
        * @param {Headers} o
@@ -49106,13 +49106,13 @@ var require_response2 = __commonJS({
         }
       }
     }
-    function fromInnerResponse(innerResponse, guard2) {
+    function fromInnerResponse(innerResponse, guard3) {
       const response = new Response4(kConstruct);
       setResponseState(response, innerResponse);
       const headers = new Headers3(kConstruct);
       setResponseHeaders(response, headers);
       setHeadersList(headers, innerResponse.headersList);
-      setHeadersGuard(headers, guard2);
+      setHeadersGuard(headers, guard3);
       if (innerResponse.urlList.length !== 0 && innerResponse.body?.stream) {
         streamRegistry.register(response, new WeakRef(innerResponse.body.stream));
       }
@@ -49786,7 +49786,7 @@ var require_request3 = __commonJS({
       }
       return newRequest;
     }
-    function fromInnerRequest(innerRequest, dispatcher, signal, guard2) {
+    function fromInnerRequest(innerRequest, dispatcher, signal, guard3) {
       const request = new Request3(kConstruct);
       setRequestState(request, innerRequest);
       setRequestDispatcher(request, dispatcher);
@@ -49794,7 +49794,7 @@ var require_request3 = __commonJS({
       const headers = new Headers3(kConstruct);
       setRequestHeaders(request, headers);
       setHeadersList(headers, innerRequest.headersList);
-      setHeadersGuard(headers, guard2);
+      setHeadersGuard(headers, guard3);
       return request;
     }
     Object.defineProperties(Request3.prototype, {
@@ -51071,8 +51071,8 @@ var require_fetch = __commonJS({
                   headersList.append(nameStr, value.toString("latin1"), true);
                 }
               }
-              const location = headersList.get("location", true);
-              const willFollow = location && request.redirect === "follow" && redirectStatusSet.has(status);
+              const location2 = headersList.get("location", true);
+              const willFollow = location2 && request.redirect === "follow" && redirectStatusSet.has(status);
               const decoders = [];
               if (request.method !== "HEAD" && request.method !== "CONNECT" && !nullBodyStatus.includes(status) && !willFollow) {
                 const contentEncoding = headersList.get("content-encoding", true);
@@ -55756,7 +55756,7 @@ var require_mime_type = __commonJS({
     "use strict";
     var MIMETypeParameters = require_mime_type_parameters();
     var parse8 = require_parser();
-    var serialize3 = require_serializer();
+    var serialize4 = require_serializer();
     var {
       asciiLowercase,
       solelyContainsHTTPTokenCodePoints
@@ -55812,7 +55812,7 @@ var require_mime_type = __commonJS({
         return this._parameters;
       }
       toString() {
-        return serialize3(this);
+        return serialize4(this);
       }
       isJavaScript({ prohibitParameters = false } = {}) {
         switch (this._type) {
@@ -64026,13 +64026,13 @@ async function fetch3(url, options_) {
       request_.setTimeout(0);
       const headers = fromRawHeaders(response_.rawHeaders);
       if (isRedirect(response_.statusCode)) {
-        const location = headers.get("Location");
+        const location2 = headers.get("Location");
         let locationURL = null;
         try {
-          locationURL = location === null ? null : new URL(location, request.url);
+          locationURL = location2 === null ? null : new URL(location2, request.url);
         } catch {
           if (request.redirect !== "manual") {
-            reject(new FetchError(`uri requested responds with an invalid redirect URL: ${location}`, "invalid-redirect"));
+            reject(new FetchError(`uri requested responds with an invalid redirect URL: ${location2}`, "invalid-redirect"));
             finalize();
             return;
           }
@@ -64249,7 +64249,7 @@ var require_gaxios = __commonJS({
     var retry_js_1 = require_retry4();
     var stream_1 = __require("stream");
     var interceptor_js_1 = require_interceptor();
-    var randomUUID = async () => globalThis.crypto?.randomUUID() || (await import("crypto")).randomUUID();
+    var randomUUID2 = async () => globalThis.crypto?.randomUUID() || (await import("crypto")).randomUUID();
     var HTTP_STATUS_NO_CONTENT = 204;
     var Gaxios = class {
       agentCache = /* @__PURE__ */ new Map();
@@ -64522,7 +64522,7 @@ var require_gaxios = __commonJS({
          */
         ["Blob", "File", "FormData"].includes(opts.data?.constructor?.name || "");
         if (opts.multipart?.length) {
-          const boundary = await randomUUID();
+          const boundary = await randomUUID2();
           preparedHeaders.set("content-type", `multipart/related; boundary=${boundary}`);
           opts.body = stream_1.Readable.from(this.getMultipartRequest(opts.multipart, boundary));
         } else if (shouldDirectlyPassData) {
@@ -73466,11 +73466,11 @@ var require_googleauth = __commonJS({
         if (!configDir) {
           return null;
         }
-        const location = path3.join(configDir, "application_default_credentials.json");
-        if (!fs3.existsSync(location)) {
+        const location2 = path3.join(configDir, "application_default_credentials.json");
+        if (!fs3.existsSync(location2)) {
           return null;
         }
-        const client = await this._getApplicationCredentialsFromFilePath(location, options);
+        const client = await this._getApplicationCredentialsFromFilePath(location2, options);
         return client;
       }
       /**
@@ -77272,9 +77272,9 @@ var require_websocket2 = __commonJS({
         emitErrorAndClose(websocket, err);
       });
       req.on("response", (res) => {
-        const location = res.headers.location;
+        const location2 = res.headers.location;
         const statusCode = res.statusCode;
-        if (location && opts.followRedirects && statusCode >= 300 && statusCode < 400) {
+        if (location2 && opts.followRedirects && statusCode >= 300 && statusCode < 400) {
           if (++websocket._redirects > opts.maxRedirects) {
             abortHandshake(websocket, req, "Maximum redirects exceeded");
             return;
@@ -77282,9 +77282,9 @@ var require_websocket2 = __commonJS({
           req.abort();
           let addr;
           try {
-            addr = new URL2(location, address);
+            addr = new URL2(location2, address);
           } catch (e2) {
-            const err = new SyntaxError(`Invalid URL: ${location}`);
+            const err = new SyntaxError(`Invalid URL: ${location2}`);
             emitErrorAndClose(websocket, err);
             return;
           }
@@ -86639,14 +86639,14 @@ var Tokenizer2 = class {
     }
   }
   _emitEOFToken() {
-    const location = this.getCurrentLocation(0);
-    if (location) {
-      location.endLine = location.startLine;
-      location.endCol = location.startCol;
-      location.endOffset = location.startOffset;
+    const location2 = this.getCurrentLocation(0);
+    if (location2) {
+      location2.endLine = location2.startLine;
+      location2.endCol = location2.startCol;
+      location2.endOffset = location2.startOffset;
     }
-    this._emitCurrentCharacterToken(location);
-    this.handler.onEof({ type: TokenType.EOF, location });
+    this._emitCurrentCharacterToken(location2);
+    this.handler.onEof({ type: TokenType.EOF, location: location2 });
     this.active = false;
   }
   //Characters emission
@@ -89450,8 +89450,8 @@ var defaultTreeAdapter = {
     return Object.prototype.hasOwnProperty.call(node, "tagName");
   },
   // Source code location
-  setNodeSourceCodeLocation(node, location) {
-    node.sourceCodeLocation = location;
+  setNodeSourceCodeLocation(node, location2) {
+    node.sourceCodeLocation = location2;
   },
   getNodeSourceCodeLocation(node) {
     return node.sourceCodeLocation;
@@ -90021,11 +90021,11 @@ var Parser2 = class {
     }
   }
   /** @protected */
-  _attachElementToTree(element, location) {
+  _attachElementToTree(element, location2) {
     if (this.options.sourceCodeLocationInfo) {
-      const loc = location && {
-        ...location,
-        startTag: location
+      const loc = location2 && {
+        ...location2,
+        startTag: location2
       };
       this.treeAdapter.setNodeSourceCodeLocation(element, loc);
     }
@@ -90348,11 +90348,11 @@ var Parser2 = class {
   }
   /** @protected */
   _fosterParentElement(element) {
-    const location = this._findFosterParentingLocation();
-    if (location.beforeElement) {
-      this.treeAdapter.insertBefore(location.parent, element, location.beforeElement);
+    const location2 = this._findFosterParentingLocation();
+    if (location2.beforeElement) {
+      this.treeAdapter.insertBefore(location2.parent, element, location2.beforeElement);
     } else {
-      this.treeAdapter.appendChild(location.parent, element);
+      this.treeAdapter.appendChild(location2.parent, element);
     }
   }
   //Special elements
@@ -93158,12 +93158,12 @@ var adapter = {
     return isDirective(node) && node.name === "!doctype";
   },
   // Source code location
-  setNodeSourceCodeLocation(node, location) {
-    if (location) {
-      node.startIndex = location.startOffset;
-      node.endIndex = location.endOffset;
+  setNodeSourceCodeLocation(node, location2) {
+    if (location2) {
+      node.startIndex = location2.startOffset;
+      node.endIndex = location2.endOffset;
     }
-    node.sourceCodeLocation = location;
+    node.sourceCodeLocation = location2;
   },
   getNodeSourceCodeLocation(node) {
     return node.sourceCodeLocation;
@@ -94066,9 +94066,9 @@ function playwrightAvailable() {
   return true;
 }
 function playwrightUnavailableMessage(tool) {
-  const hostHint = "Deploy with the included Dockerfile on Render, Railway, or Fly for real Chromium. Set ENABLE_PLAYWRIGHT=1.";
+  const hostHint = "Deploy with the included Dockerfile on Render, Railway, or Fly for real Chromium. Set ENABLE_PLAYWRIGHT=1. Or attach an existing Chrome with pw_connect (CDP browserUrl).";
   if (process.env.VERCEL) {
-    return `Tool "${tool}" requires a persistent Playwright/Chromium browser and is not available on Vercel serverless. ` + hostHint + " On Vercel, use extract_* HTTP tools instead.";
+    return `Tool "${tool}" requires a persistent Playwright/Chromium browser and is not available on Vercel serverless. ` + hostHint + " On Vercel, use extract_* HTTP tools and mail_* mailbox tools instead.";
   }
   return `Tool "${tool}" requires Playwright. Install with: npm i playwright && npx playwright install chromium. ` + hostHint;
 }
@@ -94076,10 +94076,15 @@ var pwModule = null;
 var browser = null;
 var context = null;
 var page = null;
+var connectionMode = "launch";
 var refMap = /* @__PURE__ */ new Map();
 var networkLog = [];
 var networkCounter = 0;
 var networkHooked = false;
+var consoleLog = [];
+var consoleCounter = 0;
+var consoleHooked = false;
+var performanceTracing = false;
 async function loadPlaywright() {
   if (!playwrightAvailable()) {
     throw new Error(playwrightUnavailableMessage("playwright"));
@@ -94094,52 +94099,157 @@ async function loadPlaywright() {
     );
   }
 }
+function hookNetwork(p) {
+  if (networkHooked) return;
+  networkHooked = true;
+  p.on("request", (req) => {
+    networkCounter += 1;
+    const entry = {
+      id: networkCounter,
+      method: req.method(),
+      url: req.url(),
+      resourceType: req.resourceType(),
+      timestamp: Date.now(),
+      requestHeaders: req.headers(),
+      postData: (() => {
+        try {
+          const d = req.postData();
+          return d ? d.slice(0, 4e3) : void 0;
+        } catch {
+          return void 0;
+        }
+      })()
+    };
+    networkLog.push(entry);
+    if (networkLog.length > 400) networkLog.shift();
+  });
+  p.on("response", async (res) => {
+    const req = res.request();
+    const entry = [...networkLog].reverse().find((e2) => e2.url === req.url() && e2.method === req.method() && !e2.status);
+    if (entry) {
+      entry.status = res.status();
+      try {
+        entry.responseHeaders = res.headers();
+        entry.mimeType = res.headers()["content-type"];
+      } catch {
+      }
+    }
+  });
+}
+function hookConsole(p) {
+  if (consoleHooked) return;
+  consoleHooked = true;
+  p.on("console", (msg) => {
+    consoleCounter += 1;
+    const loc = msg.location();
+    consoleLog.push({
+      id: consoleCounter,
+      type: msg.type(),
+      text: msg.text().slice(0, 4e3),
+      location: loc?.url ? `${loc.url}:${loc.lineNumber || 0}` : void 0,
+      timestamp: Date.now()
+    });
+    if (consoleLog.length > 300) consoleLog.shift();
+  });
+  p.on("pageerror", (err) => {
+    consoleCounter += 1;
+    consoleLog.push({
+      id: consoleCounter,
+      type: "error",
+      text: `Uncaught: ${err?.message || String(err)}`.slice(0, 4e3),
+      timestamp: Date.now()
+    });
+    if (consoleLog.length > 300) consoleLog.shift();
+  });
+}
+async function ensurePageHooks(p) {
+  hookNetwork(p);
+  hookConsole(p);
+}
+async function connectOverCdp(options) {
+  const pw = await loadPlaywright();
+  await closePlaywright({ keepModule: true });
+  if (options.wsEndpoint) {
+    browser = await pw.chromium.connectOverCDP(options.wsEndpoint);
+  } else {
+    const url = options.browserURL || process.env.CDP_BROWSER_URL || "http://127.0.0.1:9222";
+    browser = await pw.chromium.connectOverCDP(url);
+  }
+  connectionMode = "cdp";
+  const contexts = browser.contexts();
+  context = contexts[0] || await browser.newContext();
+  const pages = context.pages();
+  page = pages[0] || await context.newPage();
+  networkHooked = false;
+  consoleHooked = false;
+  await ensurePageHooks(page);
+  return {
+    mode: "cdp",
+    url: page.url(),
+    pages: pages.length || 1
+  };
+}
 async function getPage() {
   const pw = await loadPlaywright();
   if (!browser) {
-    browser = await pw.chromium.launch({
-      headless: process.env.PLAYWRIGHT_HEADED !== "1",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
-    });
+    const browserURL = process.env.CDP_BROWSER_URL || process.env.PW_BROWSER_URL;
+    const wsEndpoint = process.env.CDP_WS_ENDPOINT || process.env.PW_WS_ENDPOINT;
+    const userDataDir = process.env.PW_USER_DATA_DIR || process.env.CHROME_USER_DATA_DIR;
+    if (wsEndpoint || browserURL) {
+      await connectOverCdp({ browserURL, wsEndpoint });
+    } else if (userDataDir) {
+      context = await pw.chromium.launchPersistentContext(userDataDir, {
+        headless: process.env.PLAYWRIGHT_HEADED !== "1",
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--password-store=basic",
+          "--use-mock-keychain"
+        ],
+        viewport: { width: 1280, height: 720 }
+      });
+      connectionMode = "persistent";
+      browser = context.browser();
+      const pages = context.pages();
+      page = pages[0] || await context.newPage();
+      networkHooked = false;
+      consoleHooked = false;
+    } else {
+      browser = await pw.chromium.launch({
+        headless: process.env.PLAYWRIGHT_HEADED !== "1",
+        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        executablePath: process.env.CHROME_EXECUTABLE_PATH || void 0
+      });
+      connectionMode = "launch";
+    }
   }
   if (!context) {
     context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
-      userAgent: "OpenBrowserMCP-Playwright/3.0 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)"
+      userAgent: "OpenBrowserMCP-Playwright/3.1 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)"
     });
   }
   if (!page || page.isClosed()) {
     page = await context.newPage();
     networkHooked = false;
+    consoleHooked = false;
   }
-  if (!networkHooked) {
-    networkHooked = true;
-    page.on("request", (req) => {
-      networkCounter += 1;
-      networkLog.push({
-        id: networkCounter,
-        method: req.method(),
-        url: req.url(),
-        resourceType: req.resourceType(),
-        timestamp: Date.now()
-      });
-      if (networkLog.length > 300) networkLog.shift();
-    });
-    page.on("response", (res) => {
-      const req = res.request();
-      const entry = [...networkLog].reverse().find((e2) => e2.url === req.url() && e2.method === req.method() && !e2.status);
-      if (entry) entry.status = res.status();
-    });
-  }
+  await ensurePageHooks(page);
   return page;
 }
-async function closePlaywright() {
+function getConnectionMode() {
+  return connectionMode;
+}
+async function closePlaywright(opts = {}) {
   try {
-    await context?.close();
-  } catch {
-  }
-  try {
-    await browser?.close();
+    if (connectionMode === "cdp") {
+      await browser?.close?.();
+    } else if (connectionMode === "persistent") {
+      await context?.close();
+    } else {
+      await context?.close();
+      await browser?.close();
+    }
   } catch {
   }
   browser = null;
@@ -94147,7 +94257,12 @@ async function closePlaywright() {
   page = null;
   refMap.clear();
   networkLog.length = 0;
+  consoleLog.length = 0;
   networkHooked = false;
+  consoleHooked = false;
+  performanceTracing = false;
+  connectionMode = "launch";
+  if (!opts.keepModule) pwModule = null;
 }
 function escapeCss(s2) {
   return s2.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -94155,17 +94270,30 @@ function escapeCss(s2) {
 async function buildA11ySnapshot(options = {}) {
   const p = await getPage();
   const maxNodes = options.maxNodes ?? 200;
+  const maxDepth = options.maxDepth ?? 12;
   const snapshot = await p.accessibility.snapshot({ interestingOnly: options.interactiveOnly !== false });
   refMap.clear();
   const lines = [];
   let counter = 0;
   const walk = (node, depth) => {
-    if (!node || counter >= maxNodes) return;
+    if (!node || counter >= maxNodes || depth > maxDepth) return;
     const role = node.role || "node";
     const name = (node.name || "").trim();
-    const interactive = ["button", "link", "textbox", "checkbox", "radio", "combobox", "menuitem", "tab", "switch", "searchbox"].includes(
-      role
-    ) || node.focusable;
+    const interactive = [
+      "button",
+      "link",
+      "textbox",
+      "checkbox",
+      "radio",
+      "combobox",
+      "menuitem",
+      "tab",
+      "switch",
+      "searchbox",
+      "slider",
+      "spinbutton",
+      "option"
+    ].includes(role) || node.focusable;
     if (!options.interactiveOnly || interactive || depth === 0) {
       counter += 1;
       const ref = `e${counter}`;
@@ -94176,14 +94304,16 @@ async function buildA11ySnapshot(options = {}) {
         selector = `[aria-label="${escapeCss(name.slice(0, 80))}"], input[placeholder="${escapeCss(name.slice(0, 80))}"]`;
       else if (name) selector = `text=${name.slice(0, 80)}`;
       else selector = `role=${role}`;
-      refMap.set(ref, { role, name, selector });
+      refMap.set(ref, { role, name, selector, depth });
       const indent = "  ".repeat(Math.min(depth, 8));
       const extras = [
         node.value != null && String(node.value) ? `value="${String(node.value).slice(0, 40)}"` : "",
         node.checked != null ? `checked=${node.checked}` : "",
         node.disabled ? "disabled" : ""
       ].filter(Boolean).join(" ");
-      lines.push(`${indent}- ${role}${name ? ` "${name.slice(0, 100)}"` : ""} [ref=${ref}]${extras ? " " + extras : ""}`);
+      lines.push(
+        `${indent}- ${role}${name ? ` "${name.slice(0, 100)}"` : ""} [ref=${ref}]${extras ? " " + extras : ""}`
+      );
     }
     const children2 = node.children || [];
     for (const child of children2) walk(child, depth + 1);
@@ -94197,21 +94327,169 @@ async function buildA11ySnapshot(options = {}) {
     snapshot: lines.join("\n")
   };
 }
+function findInSnapshot(query) {
+  const limit = query.limit ?? 20;
+  const out = [];
+  const nameQ = (query.name || query.text || "").toLowerCase();
+  const roleQ = (query.role || "").toLowerCase();
+  for (const [ref, meta] of refMap.entries()) {
+    if (roleQ && (meta.role || "").toLowerCase() !== roleQ) continue;
+    if (nameQ && !(meta.name || "").toLowerCase().includes(nameQ)) continue;
+    out.push({ ref, role: meta.role, name: meta.name, selector: meta.selector });
+    if (out.length >= limit) break;
+  }
+  return out;
+}
 function resolveRef(target) {
   const clean = target.replace(/^@/, "").replace(/^ref=/, "");
   const entry = refMap.get(clean) || refMap.get(`e${clean}`) || refMap.get(target);
   if (entry) return entry.selector;
+  const looksLikeRef = /^e\d+$/i.test(clean);
+  if (looksLikeRef) {
+    throw new Error(
+      `Stale ref "${target}": not in the last pw_snapshot (or no snapshot yet). Re-run pw_snapshot and use a current ref.`
+    );
+  }
   return target;
 }
 function getNetworkLog(all = false) {
   return all ? [...networkLog] : networkLog.slice(-100);
 }
+function getNetworkRequest(id) {
+  return networkLog.find((e2) => e2.id === id) || null;
+}
 function clearNetworkLog() {
   networkLog.length = 0;
+}
+function getConsoleLog(opts = {}) {
+  let list = opts.all ? [...consoleLog] : consoleLog.slice(-100);
+  if (opts.type) list = list.filter((e2) => e2.type === opts.type);
+  return list;
+}
+function getConsoleMessage(id) {
+  return consoleLog.find((e2) => e2.id === id) || null;
+}
+function clearConsoleLog() {
+  consoleLog.length = 0;
+}
+async function applyEmulation(options) {
+  const p = await getPage();
+  const ctx = p.context();
+  if (options.viewport) await p.setViewportSize(options.viewport);
+  if (options.userAgent) await ctx.setExtraHTTPHeaders({ ...options.extraHTTPHeaders || {} });
+  if (options.extraHTTPHeaders) await ctx.setExtraHTTPHeaders(options.extraHTTPHeaders);
+  if (options.colorScheme) await ctx.emulateMedia({ colorScheme: options.colorScheme });
+  if (options.geolocation) {
+    await ctx.grantPermissions(["geolocation"]);
+    await ctx.setGeolocation(options.geolocation);
+  }
+  if (typeof options.offline === "boolean") await ctx.setOffline(options.offline);
+  return {
+    applied: Object.keys(options).filter((k) => options[k] != null),
+    notes: options.locale || options.timezoneId ? "locale/timezoneId require a fresh context \u2014 set PW_LOCALE / PW_TIMEZONE before launch, or reconnect." : void 0,
+    viewport: p.viewportSize(),
+    url: p.url()
+  };
+}
+async function collectPerformanceMetrics() {
+  const p = await getPage();
+  const nav = await p.evaluate(() => {
+    const t2 = performance.getEntriesByType("navigation")[0];
+    const paint = performance.getEntriesByType("paint");
+    const lcpEntries = performance.getEntriesByType("largest-contentful-paint");
+    return {
+      url: location.href,
+      timing: t2 ? {
+        domContentLoaded: Math.round(t2.domContentLoadedEventEnd),
+        loadEvent: Math.round(t2.loadEventEnd),
+        responseStart: Math.round(t2.responseStart),
+        transferSize: t2.transferSize,
+        encodedBodySize: t2.encodedBodySize
+      } : null,
+      paint: paint.map((e2) => ({ name: e2.name, startTime: Math.round(e2.startTime) })),
+      lcp: lcpEntries.length ? {
+        startTime: Math.round(lcpEntries[lcpEntries.length - 1].startTime),
+        size: lcpEntries[lcpEntries.length - 1].size
+      } : null,
+      memory: performance.memory ? {
+        usedJSHeapSize: performance.memory.usedJSHeapSize,
+        totalJSHeapSize: performance.memory.totalJSHeapSize
+      } : null
+    };
+  });
+  let cdpMetrics = [];
+  try {
+    const client = await p.context().newCDPSession(p);
+    await client.send("Performance.enable");
+    const { metrics } = await client.send("Performance.getMetrics");
+    cdpMetrics = (metrics || []).map((m2) => ({ name: m2.name, value: m2.value }));
+    await client.detach().catch(() => void 0);
+  } catch {
+  }
+  return { ...nav, cdpMetrics: cdpMetrics.slice(0, 40), tracing: performanceTracing };
+}
+async function startPerformanceTrace() {
+  const p = await getPage();
+  try {
+    await p.context().tracing.start({ screenshots: true, snapshots: true, sources: false });
+    performanceTracing = true;
+    return { ok: true, message: "Playwright tracing started (screenshots+snapshots)." };
+  } catch (err) {
+    performanceTracing = true;
+    return {
+      ok: true,
+      message: `Tracing soft-started (fallback). Metrics via pw_performance. Detail: ${err?.message || err}`
+    };
+  }
+}
+async function stopPerformanceTrace() {
+  const metrics = await collectPerformanceMetrics();
+  if (performanceTracing) {
+    try {
+      await page?.context().tracing.stop();
+    } catch {
+    }
+  }
+  performanceTracing = false;
+  return {
+    ok: true,
+    message: "Performance trace stopped. Lab metrics below (chrome-devtools-mcp style insights lite).",
+    metrics
+  };
+}
+async function evaluateScript(script) {
+  const p = await getPage();
+  const client = await p.context().newCDPSession(p);
+  try {
+    const expression = script.trim();
+    const { result, exceptionDetails } = await client.send("Runtime.evaluate", {
+      expression,
+      awaitPromise: true,
+      returnByValue: true,
+      userGesture: true
+    });
+    if (exceptionDetails) {
+      throw new Error(exceptionDetails.text || exceptionDetails.exception?.description || "Script error");
+    }
+    return result?.value;
+  } finally {
+    await client.detach().catch(() => void 0);
+  }
 }
 
 // server/playwright/tools.ts
 var MCP_PLAYWRIGHT_TOOLS = [
+  {
+    name: "pw_connect",
+    description: "Playwright/CDP: connect to an existing debuggable Chrome (chrome-devtools-mcp --browserUrl / --wsEndpoint). Example browserURL http://127.0.0.1:9222. Docker/local only.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        browserURL: { type: "string", description: "http://127.0.0.1:9222" },
+        wsEndpoint: { type: "string", description: "ws://\u2026/devtools/browser/<id>" }
+      }
+    }
+  },
   {
     name: "pw_navigate",
     description: "Playwright: navigate real Chromium to a URL. Requires Docker/long-running host (not Vercel serverless).",
@@ -94226,18 +94504,32 @@ var MCP_PLAYWRIGHT_TOOLS = [
   },
   {
     name: "pw_snapshot",
-    description: "Playwright: accessibility snapshot with element refs (e1, e2\u2026) like microsoft/playwright-mcp and agent-browser. Use refs with pw_click/pw_type.",
+    description: "Playwright: accessibility snapshot with element refs (e1, e2\u2026) like playwright-mcp, agent-browser, and chrome-devtools take_snapshot. Use refs with pw_click/pw_type.",
     inputSchema: {
       type: "object",
       properties: {
         interactiveOnly: { type: "boolean", description: "Default true" },
-        maxNodes: { type: "number" }
+        maxNodes: { type: "number" },
+        maxDepth: { type: "number" }
+      }
+    }
+  },
+  {
+    name: "pw_find",
+    description: "Find refs in the last pw_snapshot by role and/or name/text (P0 snapshot/ref standardization). Call pw_snapshot first.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        role: { type: "string", description: "e.g. button, link, textbox" },
+        name: { type: "string", description: "Substring match on accessible name" },
+        text: { type: "string", description: "Alias of name" },
+        limit: { type: "number" }
       }
     }
   },
   {
     name: "pw_click",
-    description: 'Playwright: click by ref from pw_snapshot (e.g. "e5") or a selector.',
+    description: 'Playwright: click by ref from pw_snapshot (e.g. "e5") or a selector. Auto-snapshots after click.',
     inputSchema: {
       type: "object",
       properties: {
@@ -94262,14 +94554,122 @@ var MCP_PLAYWRIGHT_TOOLS = [
     }
   },
   {
+    name: "pw_hover",
+    description: "Playwright: hover by ref or selector (chrome-devtools hover).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        ref: { type: "string" },
+        selector: { type: "string" }
+      }
+    }
+  },
+  {
+    name: "pw_press",
+    description: "Playwright: press a key (Enter, Tab, Escape, Control+a\u2026).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        key: { type: "string" },
+        ref: { type: "string" },
+        selector: { type: "string" }
+      },
+      required: ["key"]
+    }
+  },
+  {
+    name: "pw_wait",
+    description: "Wait for selector, text, timeout, or URL substring.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        selector: { type: "string" },
+        text: { type: "string" },
+        urlIncludes: { type: "string" },
+        timeoutMs: { type: "number" }
+      }
+    }
+  },
+  {
     name: "pw_network",
-    description: "Playwright: list captured network/XHR requests for the current page.",
+    description: "List captured network/XHR requests (chrome-devtools list_network_requests).",
     inputSchema: {
       type: "object",
       properties: {
         clear: { type: "boolean", description: "Clear log after read" },
+        all: { type: "boolean" },
+        resourceType: { type: "string", description: "Filter e.g. xhr, fetch, document" }
+      }
+    }
+  },
+  {
+    name: "pw_network_request",
+    description: "Get one network request by id including headers/postData (chrome-devtools get_network_request).",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "number" } },
+      required: ["id"]
+    }
+  },
+  {
+    name: "pw_console",
+    description: "List browser console messages + page errors (chrome-devtools list_console_messages).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        type: { type: "string", description: "Filter: log|error|warning|info|debug" },
+        clear: { type: "boolean" },
         all: { type: "boolean" }
       }
+    }
+  },
+  {
+    name: "pw_console_message",
+    description: "Get one console message by id (chrome-devtools get_console_message).",
+    inputSchema: {
+      type: "object",
+      properties: { id: { type: "number" } },
+      required: ["id"]
+    }
+  },
+  {
+    name: "pw_emulate",
+    description: "Emulate viewport, colorScheme, geolocation, offline, extra headers (chrome-devtools emulate / resize_page).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        width: { type: "number" },
+        height: { type: "number" },
+        colorScheme: { type: "string", enum: ["light", "dark", "no-preference"] },
+        offline: { type: "boolean" },
+        latitude: { type: "number" },
+        longitude: { type: "number" },
+        userAgent: { type: "string" },
+        extraHTTPHeaders: { type: "object" }
+      }
+    }
+  },
+  {
+    name: "pw_performance",
+    description: "Collect lab performance metrics (Navigation Timing, paint, LCP, CDP Performance.getMetrics). Inspired by chrome-devtools performance_* tools.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["metrics", "start_trace", "stop_trace"],
+          description: "Default metrics"
+        }
+      }
+    }
+  },
+  {
+    name: "pw_evaluate",
+    description: "Evaluate JavaScript in the page via CDP Runtime.evaluate (chrome-devtools evaluate_script).",
+    inputSchema: {
+      type: "object",
+      properties: { script: { type: "string" } },
+      required: ["script"]
     }
   },
   {
@@ -94277,9 +94677,7 @@ var MCP_PLAYWRIGHT_TOOLS = [
     description: "Playwright: capture PNG screenshot (base64).",
     inputSchema: {
       type: "object",
-      properties: {
-        fullPage: { type: "boolean" }
-      }
+      properties: { fullPage: { type: "boolean" } }
     }
   },
   {
@@ -94287,9 +94685,7 @@ var MCP_PLAYWRIGHT_TOOLS = [
     description: "Playwright: render current page to PDF (base64). Chromium only.",
     inputSchema: {
       type: "object",
-      properties: {
-        landscape: { type: "boolean" }
-      }
+      properties: { landscape: { type: "boolean" } }
     }
   },
   {
@@ -94300,14 +94696,19 @@ var MCP_PLAYWRIGHT_TOOLS = [
       properties: {
         direction: { type: "string", enum: ["down", "up", "top", "bottom"] },
         amount: { type: "number" },
-        infiniteSteps: { type: "number", description: "If set, perform N infinite-scroll steps" },
+        infiniteSteps: { type: "number" },
         waitMs: { type: "number" }
       }
     }
   },
   {
+    name: "pw_status",
+    description: "Show Playwright connection mode (launch|cdp|persistent) and current page URL.",
+    inputSchema: { type: "object", properties: {} }
+  },
+  {
     name: "pw_close",
-    description: "Playwright: close browser session and free resources.",
+    description: "Close Playwright session. For CDP mode, detaches without quitting the user Chrome.",
     inputSchema: { type: "object", properties: {} }
   }
 ];
@@ -94332,6 +94733,13 @@ async function guard(tool, fn) {
 async function executePlaywrightTool(name, args) {
   return guard(name, async () => {
     switch (name) {
+      case "pw_connect": {
+        const info = await connectOverCdp({
+          browserURL: args.browserURL,
+          wsEndpoint: args.wsEndpoint
+        });
+        return textResult(JSON.stringify({ ok: true, ...info }, null, 2));
+      }
       case "pw_navigate": {
         const p = await getPage();
         await p.goto(args.url, { waitUntil: args.waitUntil || "domcontentloaded", timeout: 45e3 });
@@ -94347,7 +94755,8 @@ ${snap.snapshot.slice(0, 6e3)}`
       case "pw_snapshot": {
         const snap = await buildA11ySnapshot({
           interactiveOnly: args.interactiveOnly !== false,
-          maxNodes: args.maxNodes
+          maxNodes: args.maxNodes,
+          maxDepth: args.maxDepth
         });
         return textResult(
           `URL: ${snap.url}
@@ -94356,6 +94765,15 @@ Refs: ${snap.refs}
 
 ${snap.snapshot}`
         );
+      }
+      case "pw_find": {
+        const hits = findInSnapshot({
+          role: args.role,
+          name: args.name,
+          text: args.text,
+          limit: args.limit
+        });
+        return textResult(JSON.stringify({ count: hits.length, hits }, null, 2));
       }
       case "pw_click": {
         const p = await getPage();
@@ -94377,10 +94795,92 @@ ${snap.snapshot.slice(0, 4e3)}`);
         if (args.pressEnter) await loc.press("Enter");
         return textResult(`Typed into ${args.ref || args.selector}`);
       }
+      case "pw_hover": {
+        const p = await getPage();
+        const target = args.ref ? resolveRef(args.ref) : args.selector;
+        if (!target) throw new Error("Provide ref or selector");
+        await p.locator(target).first().hover({ timeout: 15e3 });
+        return textResult(`Hovered ${args.ref || args.selector}`);
+      }
+      case "pw_press": {
+        const p = await getPage();
+        if (args.ref || args.selector) {
+          const target = args.ref ? resolveRef(args.ref) : args.selector;
+          await p.locator(target).first().press(args.key, { timeout: 15e3 });
+        } else {
+          await p.keyboard.press(args.key);
+        }
+        return textResult(`Pressed ${args.key}`);
+      }
+      case "pw_wait": {
+        const p = await getPage();
+        const timeout = args.timeoutMs ?? 15e3;
+        if (args.selector) await p.waitForSelector(args.selector, { timeout });
+        else if (args.text) await p.getByText(args.text).first().waitFor({ timeout });
+        else if (args.urlIncludes) {
+          await p.waitForFunction(
+            (s2) => location.href.includes(s2),
+            args.urlIncludes,
+            { timeout }
+          );
+        } else await p.waitForTimeout(Math.min(timeout, 1e4));
+        return textResult(`Wait done. URL=${p.url()}`);
+      }
       case "pw_network": {
-        const logs = getNetworkLog(!!args.all);
+        let logs = getNetworkLog(!!args.all);
+        if (args.resourceType) {
+          logs = logs.filter((e2) => e2.resourceType === args.resourceType);
+        }
         if (args.clear) clearNetworkLog();
-        return textResult(JSON.stringify({ count: logs.length, requests: logs }, null, 2));
+        const slim = logs.map(({ id, method, url, status, resourceType, timestamp }) => ({
+          id,
+          method,
+          url,
+          status,
+          resourceType,
+          timestamp
+        }));
+        return textResult(JSON.stringify({ count: slim.length, requests: slim }, null, 2));
+      }
+      case "pw_network_request": {
+        const entry = getNetworkRequest(Number(args.id));
+        if (!entry) throw new Error(`No network request id=${args.id}`);
+        return textResult(JSON.stringify(entry, null, 2));
+      }
+      case "pw_console": {
+        const logs = getConsoleLog({ type: args.type, all: !!args.all });
+        if (args.clear) clearConsoleLog();
+        return textResult(JSON.stringify({ count: logs.length, messages: logs }, null, 2));
+      }
+      case "pw_console_message": {
+        const msg = getConsoleMessage(Number(args.id));
+        if (!msg) throw new Error(`No console message id=${args.id}`);
+        return textResult(JSON.stringify(msg, null, 2));
+      }
+      case "pw_emulate": {
+        const result = await applyEmulation({
+          viewport: args.width && args.height ? { width: args.width, height: args.height } : void 0,
+          colorScheme: args.colorScheme,
+          offline: args.offline,
+          geolocation: args.latitude != null && args.longitude != null ? { latitude: args.latitude, longitude: args.longitude } : void 0,
+          userAgent: args.userAgent,
+          extraHTTPHeaders: args.extraHTTPHeaders
+        });
+        return textResult(JSON.stringify(result, null, 2));
+      }
+      case "pw_performance": {
+        const action = args.action || "metrics";
+        if (action === "start_trace") {
+          return textResult(JSON.stringify(await startPerformanceTrace(), null, 2));
+        }
+        if (action === "stop_trace") {
+          return textResult(JSON.stringify(await stopPerformanceTrace(), null, 2));
+        }
+        return textResult(JSON.stringify(await collectPerformanceMetrics(), null, 2));
+      }
+      case "pw_evaluate": {
+        const value = await evaluateScript(args.script);
+        return textResult(JSON.stringify({ result: value }, null, 2));
       }
       case "pw_screenshot": {
         const p = await getPage();
@@ -94401,7 +94901,10 @@ ${snap.snapshot.slice(0, 4e3)}`);
               type: "text",
               text: `PDF generated (${buf.byteLength} bytes). Base64 follows as resource text for transfer.`
             },
-            { type: "text", text: `data:application/pdf;base64,${buf.toString("base64").slice(0, 200)}\u2026[truncated base64]` }
+            {
+              type: "text",
+              text: `data:application/pdf;base64,${buf.toString("base64").slice(0, 200)}\u2026[truncated base64]`
+            }
           ]
         };
       }
@@ -94426,12 +94929,544 @@ ${snap.snapshot.slice(0, 4e3)}`);
         else await p.evaluate((a) => window.scrollBy(0, a), amount);
         return textResult(`Scrolled ${dir}`);
       }
+      case "pw_status": {
+        let url = "";
+        let title = "";
+        try {
+          const p = await getPage();
+          url = p.url();
+          title = await p.title();
+        } catch {
+        }
+        return textResult(
+          JSON.stringify(
+            {
+              mode: getConnectionMode(),
+              available: playwrightAvailable(),
+              url,
+              title,
+              platform: process.env.VERCEL ? "vercel" : "long-running"
+            },
+            null,
+            2
+          )
+        );
+      }
       case "pw_close": {
         await closePlaywright();
-        return textResult("Playwright browser closed.");
+        return textResult("Playwright browser closed / CDP detached.");
       }
       default:
         throw new Error(`Unknown playwright tool: ${name}`);
+    }
+  });
+}
+
+// server/mailbox/index.ts
+import { randomUUID } from "crypto";
+var messages = [];
+var agents = /* @__PURE__ */ new Map();
+var MAX_MESSAGES = 500;
+function textResult2(data2) {
+  return { content: [{ type: "text", text: typeof data2 === "string" ? data2 : JSON.stringify(data2, null, 2) }] };
+}
+function serialize3(m2) {
+  return {
+    id: m2.id,
+    from: m2.from,
+    to: m2.to,
+    room: m2.room,
+    body: m2.body,
+    priority: m2.priority,
+    tags: m2.tags,
+    threadId: m2.threadId,
+    kind: m2.kind,
+    handoff: m2.handoff,
+    createdAt: m2.createdAt,
+    readBy: [...m2.readBy],
+    archived: !!m2.archived
+  };
+}
+function touchAgent(id) {
+  const existing = agents.get(id);
+  agents.set(id, {
+    id,
+    status: existing?.status || "idle",
+    lastSeen: Date.now()
+  });
+}
+function pushMessage(msg) {
+  messages.unshift(msg);
+  if (messages.length > MAX_MESSAGES) messages.length = MAX_MESSAGES;
+}
+var MCP_MAIL_TOOLS = [
+  {
+    name: "mail_whoami",
+    description: "Show suggested agent id for this process (mailnotmilk whoami pattern). Works on Vercel.",
+    inputSchema: { type: "object", properties: { agentId: { type: "string" } } }
+  },
+  {
+    name: "mail_register",
+    description: "Register or refresh agent presence in the shared mailbox roster.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "string" },
+        status: { type: "string", enum: ["idle", "working", "waiting"] }
+      },
+      required: ["agentId"]
+    }
+  },
+  {
+    name: "mail_post",
+    description: "Post markdown to an agent (DM) or omit `to` and set `room` for broadcast (mailnotmilk post_message).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: { type: "string" },
+        to: { type: "string" },
+        room: { type: "string" },
+        body: { type: "string" },
+        priority: { type: "string", enum: ["low", "normal", "high", "urgent"] },
+        tags: { type: "array", items: { type: "string" } }
+      },
+      required: ["from", "body"]
+    }
+  },
+  {
+    name: "mail_handoff",
+    description: "Structured task handoff to another agent (mailnotmilk post_handoff).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        from: { type: "string" },
+        to: { type: "string" },
+        title: { type: "string" },
+        objective: { type: "string" },
+        acceptance: { type: "string" },
+        files: { type: "array", items: { type: "string" } },
+        body: { type: "string" }
+      },
+      required: ["from", "to", "title", "objective"]
+    }
+  },
+  {
+    name: "mail_inbox",
+    description: "List unread messages for an agent (DMs, room broadcasts, @mentions). Priority-sorted.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        agentId: { type: "string" },
+        room: { type: "string" },
+        limit: { type: "number" }
+      },
+      required: ["agentId"]
+    }
+  },
+  {
+    name: "mail_read",
+    description: "Fetch a message and mark it read for the agent.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string" },
+        agentId: { type: "string" }
+      },
+      required: ["id", "agentId"]
+    }
+  },
+  {
+    name: "mail_reply",
+    description: "Reply in-thread; routes back to the original sender.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        id: { type: "string", description: "Parent message id" },
+        from: { type: "string" },
+        body: { type: "string" }
+      },
+      required: ["id", "from", "body"]
+    }
+  },
+  {
+    name: "mail_board",
+    description: "Human-readable status board: agents, rooms, urgent, recent (mailnotmilk mailbox_board).",
+    inputSchema: { type: "object", properties: {} }
+  },
+  {
+    name: "mail_stats",
+    description: "Aggregate mailbox stats (counts, priorities, live agents).",
+    inputSchema: { type: "object", properties: {} }
+  }
+];
+var MAIL_TOOL_NAMES = new Set(MCP_MAIL_TOOLS.map((t2) => t2.name));
+var PRIORITY_RANK = {
+  urgent: 0,
+  high: 1,
+  normal: 2,
+  low: 3
+};
+async function executeMailTool(name, args) {
+  switch (name) {
+    case "mail_whoami": {
+      const id = args.agentId || process.env.MAIL_AGENT_ID || `agent-${process.pid}`;
+      touchAgent(id);
+      return textResult2({
+        agentId: id,
+        platform: process.env.VERCEL ? "vercel-ephemeral" : "long-running",
+        note: "On Vercel, mailbox state is per warm instance only."
+      });
+    }
+    case "mail_register": {
+      agents.set(args.agentId, {
+        id: args.agentId,
+        status: args.status || "idle",
+        lastSeen: Date.now()
+      });
+      return textResult2({ ok: true, agent: agents.get(args.agentId) });
+    }
+    case "mail_post": {
+      touchAgent(args.from);
+      const msg = {
+        id: randomUUID(),
+        from: args.from,
+        to: args.to,
+        room: args.room || (args.to ? void 0 : "lobby"),
+        body: args.body,
+        priority: args.priority || "normal",
+        tags: args.tags || [],
+        kind: "message",
+        createdAt: Date.now(),
+        readBy: /* @__PURE__ */ new Set()
+      };
+      pushMessage(msg);
+      return textResult2({ ok: true, message: serialize3(msg) });
+    }
+    case "mail_handoff": {
+      touchAgent(args.from);
+      const msg = {
+        id: randomUUID(),
+        from: args.from,
+        to: args.to,
+        body: args.body || `${args.title}
+
+${args.objective}`,
+        priority: "high",
+        tags: ["handoff"],
+        kind: "handoff",
+        handoff: {
+          title: args.title,
+          objective: args.objective,
+          acceptance: args.acceptance,
+          files: args.files
+        },
+        createdAt: Date.now(),
+        readBy: /* @__PURE__ */ new Set()
+      };
+      pushMessage(msg);
+      return textResult2({ ok: true, message: serialize3(msg) });
+    }
+    case "mail_inbox": {
+      touchAgent(args.agentId);
+      const limit = args.limit ?? 20;
+      const unread = messages.filter((m2) => !m2.archived).filter((m2) => !m2.readBy.has(args.agentId)).filter((m2) => {
+        if (m2.to && m2.to === args.agentId) return true;
+        if (!m2.to && m2.room && (!args.room || m2.room === args.room)) return true;
+        if (m2.body.includes(`@${args.agentId}`)) return true;
+        return false;
+      }).sort((a, b) => PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] || b.createdAt - a.createdAt).slice(0, limit).map(serialize3);
+      return textResult2({ count: unread.length, messages: unread });
+    }
+    case "mail_read": {
+      const msg = messages.find((m2) => m2.id === args.id);
+      if (!msg) return textResult2({ error: `message not found: ${args.id}` });
+      msg.readBy.add(args.agentId);
+      touchAgent(args.agentId);
+      return textResult2({ message: serialize3(msg) });
+    }
+    case "mail_reply": {
+      const parent2 = messages.find((m2) => m2.id === args.id);
+      if (!parent2) return textResult2({ error: `parent not found: ${args.id}` });
+      touchAgent(args.from);
+      const msg = {
+        id: randomUUID(),
+        from: args.from,
+        to: parent2.from,
+        room: parent2.room,
+        body: args.body,
+        priority: parent2.priority,
+        tags: ["reply"],
+        threadId: parent2.threadId || parent2.id,
+        kind: "reply",
+        createdAt: Date.now(),
+        readBy: /* @__PURE__ */ new Set()
+      };
+      pushMessage(msg);
+      return textResult2({ ok: true, message: serialize3(msg) });
+    }
+    case "mail_board": {
+      const rooms = /* @__PURE__ */ new Map();
+      for (const m2 of messages) {
+        if (m2.room) rooms.set(m2.room, (rooms.get(m2.room) || 0) + 1);
+      }
+      const urgent = messages.filter((m2) => m2.priority === "urgent" && !m2.archived).slice(0, 5).map(serialize3);
+      const recent = messages.slice(0, 10).map(serialize3);
+      return textResult2({
+        agents: [...agents.values()],
+        rooms: [...rooms.entries()].map(([name2, count]) => ({ name: name2, count })),
+        urgent,
+        recent,
+        note: process.env.VERCEL ? "ephemeral on Vercel warm instance" : "in-memory process mailbox"
+      });
+    }
+    case "mail_stats": {
+      const byPriority = {};
+      for (const m2 of messages) byPriority[m2.priority] = (byPriority[m2.priority] || 0) + 1;
+      return textResult2({
+        totalMessages: messages.length,
+        byPriority,
+        agents: agents.size,
+        platform: process.env.VERCEL ? "vercel-ephemeral" : "long-running"
+      });
+    }
+    default:
+      throw new Error(`Unknown mail tool: ${name}`);
+  }
+}
+
+// server/ai-web/index.ts
+var AI_PROVIDERS = {
+  chatgpt: {
+    name: "ChatGPT",
+    url: "https://chatgpt.com",
+    composerHints: ["#prompt-textarea", 'div[contenteditable="true"]', "textarea"],
+    messageHints: ["[data-message-author-role]", "article", '[class*="markdown"]']
+  },
+  gemini: {
+    name: "Google Gemini",
+    url: "https://gemini.google.com/app",
+    composerHints: ["rich-textarea", 'div[contenteditable="true"]', "textarea"],
+    messageHints: ["message-content", '[class*="model-response"]', "article"]
+  },
+  deepseek: {
+    name: "DeepSeek",
+    url: "https://chat.deepseek.com",
+    composerHints: ["textarea", 'div[contenteditable="true"]'],
+    messageHints: ['[class*="message"]', "article"]
+  },
+  grok: {
+    name: "xAI Grok",
+    url: "https://grok.com",
+    composerHints: ["textarea", 'div[contenteditable="true"]'],
+    messageHints: ['[class*="message"]', "article"]
+  },
+  copilot: {
+    name: "Microsoft Copilot",
+    url: "https://copilot.microsoft.com",
+    composerHints: ["textarea", 'div[contenteditable="true"]'],
+    messageHints: ['[class*="message"]', "article"]
+  },
+  claude: {
+    name: "Claude.ai",
+    url: "https://claude.ai/new",
+    composerHints: ['div[contenteditable="true"]', "textarea"],
+    messageHints: ["[data-test-render-count]", "article", '[class*="font-claude"]']
+  },
+  perplexity: {
+    name: "Perplexity",
+    url: "https://www.perplexity.ai",
+    composerHints: ["textarea", 'div[contenteditable="true"]'],
+    messageHints: ['[class*="prose"]', "article"]
+  }
+};
+var MCP_AI_WEB_TOOLS = [
+  {
+    name: "ai_list_providers",
+    description: "List supported browser-AI providers (browser-ai-bridge / mailnotmilk). Docker/local for automation; list works everywhere.",
+    inputSchema: { type: "object", properties: {} }
+  },
+  {
+    name: "ai_open",
+    description: "Open a browser-AI site (chatgpt|gemini|deepseek|grok|copilot|claude|perplexity) or custom URL. Requires Playwright host.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        provider: { type: "string" },
+        url: { type: "string", description: "Custom URL override" }
+      }
+    }
+  },
+  {
+    name: "ai_extract_messages",
+    description: "Parse visible chat turns from the open browser AI page (mailnotmilk browser_extract_messages). Heuristic selectors.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        provider: { type: "string" },
+        limit: { type: "number" }
+      }
+    }
+  },
+  {
+    name: "ai_send_message",
+    description: "Type a message into the browser AI composer and optionally press Enter (mailnotmilk browser_send_message / browser-ai-bridge ask).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        text: { type: "string" },
+        provider: { type: "string" },
+        pressEnter: { type: "boolean", description: "Default true" }
+      },
+      required: ["text"]
+    }
+  },
+  {
+    name: "ai_status",
+    description: "Show current page URL/title and whether Playwright is available for browser-AI tools.",
+    inputSchema: { type: "object", properties: {} }
+  }
+];
+var AI_WEB_TOOL_NAMES = new Set(MCP_AI_WEB_TOOLS.map((t2) => t2.name));
+function textResult3(data2) {
+  return { content: [{ type: "text", text: typeof data2 === "string" ? data2 : JSON.stringify(data2, null, 2) }] };
+}
+async function guard2(tool, fn) {
+  if (tool === "ai_list_providers") return fn();
+  if (!playwrightAvailable()) {
+    return textResult3(`\u274C ${playwrightUnavailableMessage(tool)}`);
+  }
+  try {
+    return await fn();
+  } catch (err) {
+    return textResult3(`\u274C ai-web error in ${tool}: ${err?.message || err}`);
+  }
+}
+async function findFirstLocator(hints) {
+  const p = await getPage();
+  for (const sel of hints) {
+    const loc = p.locator(sel).first();
+    if (await loc.count() > 0) {
+      try {
+        if (await loc.isVisible()) return loc;
+      } catch {
+        return loc;
+      }
+    }
+  }
+  return null;
+}
+async function executeAiWebTool(name, args) {
+  return guard2(name, async () => {
+    switch (name) {
+      case "ai_list_providers":
+        return textResult3({
+          providers: Object.entries(AI_PROVIDERS).map(([id, p]) => ({
+            id,
+            name: p.name,
+            url: p.url
+          })),
+          notes: [
+            "Adopted from jeffrey-nz/browser-ai-bridge (exact npm name) and jrb00013/mailnotmilk.",
+            "Related candidates if you meant a different project: YosefHayim/ai-browser-bridge, usedhonda/chrome-ai-bridge.",
+            "Requires signed-in Chrome profile (PW_USER_DATA_DIR or pw_connect CDP) for real answers \u2014 no API keys."
+          ]
+        });
+      case "ai_open": {
+        const provider = args.provider ? AI_PROVIDERS[String(args.provider).toLowerCase()] : null;
+        const url = args.url || provider?.url;
+        if (!url) throw new Error("Provide provider or url");
+        const p = await getPage();
+        await p.goto(url, { waitUntil: "domcontentloaded", timeout: 45e3 });
+        const snap = await buildA11ySnapshot({ interactiveOnly: true, maxNodes: 40 });
+        return textResult3({
+          ok: true,
+          provider: args.provider || null,
+          url: p.url(),
+          title: snap.title,
+          snapshotPreview: snap.snapshot.slice(0, 2500)
+        });
+      }
+      case "ai_extract_messages": {
+        const p = await getPage();
+        const provider = args.provider ? AI_PROVIDERS[String(args.provider).toLowerCase()] : null;
+        const hints = provider?.messageHints || [
+          "[data-message-author-role]",
+          "article",
+          '[class*="markdown"]',
+          '[class*="message"]'
+        ];
+        const limit = Math.min(Number(args.limit) || 30, 80);
+        const messages2 = [];
+        for (const sel of hints) {
+          const nodes = p.locator(sel);
+          const count = Math.min(await nodes.count(), limit);
+          for (let i2 = 0; i2 < count; i2++) {
+            const text3 = (await nodes.nth(i2).innerText().catch(() => "") || "").trim();
+            if (text3 && text3.length > 1) messages2.push({ index: i2, text: text3.slice(0, 4e3), selector: sel });
+          }
+          if (messages2.length) break;
+        }
+        if (!messages2.length) {
+          const snap = await buildA11ySnapshot({ interactiveOnly: false, maxNodes: 100 });
+          return textResult3({
+            count: 0,
+            warning: "No chat nodes matched heuristics; returning a11y snapshot instead.",
+            url: p.url(),
+            snapshot: snap.snapshot.slice(0, 6e3)
+          });
+        }
+        return textResult3({
+          count: messages2.length,
+          url: p.url(),
+          messages: messages2.slice(-limit)
+        });
+      }
+      case "ai_send_message": {
+        const provider = args.provider ? AI_PROVIDERS[String(args.provider).toLowerCase()] : null;
+        const hints = provider?.composerHints || [
+          'div[contenteditable="true"]',
+          "textarea",
+          "#prompt-textarea"
+        ];
+        const loc = await findFirstLocator(hints);
+        if (!loc) throw new Error("Could not find AI composer. Open the site with ai_open and ensure logged in.");
+        await loc.click({ timeout: 1e4 });
+        try {
+          await loc.fill(args.text);
+        } catch {
+          await loc.type(args.text, { delay: 15 });
+        }
+        if (args.pressEnter !== false) {
+          await loc.press("Enter").catch(async () => {
+            const p = await getPage();
+            await p.keyboard.press("Enter");
+          });
+        }
+        return textResult3({
+          ok: true,
+          sentChars: String(args.text).length,
+          pressEnter: args.pressEnter !== false,
+          note: "Generation is async; poll with ai_extract_messages after a few seconds."
+        });
+      }
+      case "ai_status": {
+        if (!playwrightAvailable()) {
+          return textResult3({
+            available: false,
+            reason: playwrightUnavailableMessage("ai_status"),
+            providers: Object.keys(AI_PROVIDERS)
+          });
+        }
+        const p = await getPage();
+        return textResult3({
+          available: true,
+          url: p.url(),
+          title: await p.title(),
+          providers: Object.keys(AI_PROVIDERS)
+        });
+      }
+      default:
+        throw new Error(`Unknown ai-web tool: ${name}`);
     }
   });
 }
@@ -94440,7 +95475,9 @@ ${snap.snapshot.slice(0, 4e3)}`);
 var ALL_MCP_TOOLS = [
   ...MCP_BROWSER_TOOLS,
   ...MCP_EXTRACT_TOOLS,
-  ...MCP_PLAYWRIGHT_TOOLS
+  ...MCP_PLAYWRIGHT_TOOLS,
+  ...MCP_MAIL_TOOLS,
+  ...MCP_AI_WEB_TOOLS
 ];
 async function executeRegisteredTool(name, args) {
   if (EXTRACT_TOOL_NAMES.has(name)) {
@@ -94448,6 +95485,12 @@ async function executeRegisteredTool(name, args) {
   }
   if (PLAYWRIGHT_TOOL_NAMES.has(name)) {
     return executePlaywrightTool(name, args);
+  }
+  if (MAIL_TOOL_NAMES.has(name)) {
+    return executeMailTool(name, args);
+  }
+  if (AI_WEB_TOOL_NAMES.has(name)) {
+    return executeAiWebTool(name, args);
   }
   return null;
 }
@@ -94517,7 +95560,7 @@ data: ${messageUrl}
               protocolVersion: "2024-11-05",
               serverInfo: {
                 name: "open-browser-mcp-server",
-                version: "3.0.0"
+                version: "3.1.0"
               },
               capabilities: {
                 tools: {
@@ -107269,9 +108312,9 @@ var Live = class {
     const headers = mapToHeaders(clientHeaders);
     if (this.apiClient.isVertexAI()) {
       const project = this.apiClient.getProject();
-      const location = this.apiClient.getLocation();
+      const location2 = this.apiClient.getLocation();
       const apiKey = this.apiClient.getApiKey();
-      const hasStandardAuth = !!project && !!location || !!apiKey;
+      const hasStandardAuth = !!project && !!location2 || !!apiKey;
       if (this.apiClient.getCustomBaseUrl() && !hasStandardAuth) {
         url = websocketBaseUrl;
       } else {
@@ -107320,9 +108363,9 @@ var Live = class {
     let transformedModel = tModel(this.apiClient, params.model);
     if (this.apiClient.isVertexAI() && transformedModel.startsWith("publishers/")) {
       const project = this.apiClient.getProject();
-      const location = this.apiClient.getLocation();
-      if (project && location) {
-        transformedModel = `projects/${project}/locations/${location}/` + transformedModel;
+      const location2 = this.apiClient.getLocation();
+      if (project && location2) {
+        transformedModel = `projects/${project}/locations/${location2}/` + transformedModel;
       }
     }
     let clientMessage = {};
@@ -113839,11 +114882,57 @@ app.post("/api/extract/:tool", async (req, res) => {
 app.get("/api/extract/health", (_req, res) => {
   res.json({
     ok: true,
+    version: "3.1.0",
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
+    mailTools: [...MAIL_TOOL_NAMES],
+    aiWebTools: [...AI_WEB_TOOL_NAMES],
     playwrightEnabled: !process.env.VERCEL && process.env.DISABLE_PLAYWRIGHT !== "1",
-    platform: process.env.VERCEL ? "vercel-serverless" : "long-running"
+    platform: process.env.VERCEL ? "vercel-serverless" : "long-running",
+    inspirations: [
+      "ChromeDevTools/chrome-devtools-mcp",
+      "jeffrey-nz/browser-ai-bridge",
+      "jrb00013/mailnotmilk",
+      "vercel-labs/agent-browser",
+      "microsoft/playwright-mcp"
+    ]
   });
+});
+app.post("/api/mail/:tool", async (req, res) => {
+  const tool = `mail_${req.params.tool}`;
+  if (!MAIL_TOOL_NAMES.has(tool)) {
+    return res.status(404).json({ error: `Unknown mail tool: ${tool}`, available: [...MAIL_TOOL_NAMES] });
+  }
+  try {
+    const result = await executeMailTool(tool, req.body || {});
+    const textBody = result?.content?.[0]?.text;
+    let data2 = textBody;
+    try {
+      data2 = JSON.parse(textBody);
+    } catch {
+    }
+    return res.json({ ok: true, tool, data: data2 });
+  } catch (err) {
+    return res.status(500).json({ ok: false, tool, error: err?.message || String(err) });
+  }
+});
+app.post("/api/ai/:tool", async (req, res) => {
+  const tool = `ai_${req.params.tool}`;
+  if (!AI_WEB_TOOL_NAMES.has(tool)) {
+    return res.status(404).json({ error: `Unknown ai tool: ${tool}`, available: [...AI_WEB_TOOL_NAMES] });
+  }
+  try {
+    const result = await executeAiWebTool(tool, req.body || {});
+    const textBody = result?.content?.[0]?.text;
+    let data2 = textBody;
+    try {
+      data2 = JSON.parse(textBody);
+    } catch {
+    }
+    return res.json({ ok: true, tool, data: data2 });
+  } catch (err) {
+    return res.status(500).json({ ok: false, tool, error: err?.message || String(err) });
+  }
 });
 app.get("/api/mcp/tools", (_req, res) => {
   res.json({
@@ -113851,12 +114940,16 @@ app.get("/api/mcp/tools", (_req, res) => {
     groups: {
       browser: MCP_BROWSER_TOOLS.map((t2) => t2.name),
       extract: ALL_MCP_TOOLS.filter((t2) => t2.name.startsWith("extract_")).map((t2) => t2.name),
-      playwright: ALL_MCP_TOOLS.filter((t2) => t2.name.startsWith("pw_")).map((t2) => t2.name)
+      playwright: ALL_MCP_TOOLS.filter((t2) => t2.name.startsWith("pw_")).map((t2) => t2.name),
+      mail: ALL_MCP_TOOLS.filter((t2) => t2.name.startsWith("mail_")).map((t2) => t2.name),
+      aiWeb: ALL_MCP_TOOLS.filter((t2) => t2.name.startsWith("ai_")).map((t2) => t2.name)
     },
     notes: {
       extract: "HTTP-based extraction \u2014 works on Vercel serverless",
-      playwright: "Real Chromium \u2014 requires Docker/long-running host; degrades with clear error on Vercel",
-      browser: "Simulated in-app browser driven by the UI"
+      playwright: "Real Chromium + CDP connect/console/network/emulate/performance \u2014 Docker/local; clear error on Vercel",
+      browser: "Simulated in-app browser driven by the UI",
+      mail: "In-memory agent mailbox (mailnotmilk-inspired) \u2014 works on Vercel warm instance (ephemeral)",
+      aiWeb: "Drive logged-in browser AI UIs (browser-ai-bridge / mailnotmilk) \u2014 Docker/local only"
     }
   });
 });
