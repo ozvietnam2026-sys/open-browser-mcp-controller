@@ -72080,19 +72080,8 @@ var init_map = __esm({
 });
 
 // server/extract/search.ts
-async function searchWeb(opts) {
-  const limit = Math.min(opts.limit ?? 10, 25);
-  const q = opts.query.trim();
-  if (!q) throw new Error("query required");
-  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`;
-  const res = await fetchUrl(url, {
-    ignoreCache: true,
-    headers: {
-      // DDG HTML endpoint
-      Accept: "text/html"
-    }
-  });
-  const $2 = loadHtml(res.bodyText);
+function parseResults(html3, limit) {
+  const $2 = loadHtml(html3);
   const results = [];
   $2(".result").each((_, el) => {
     if (results.length >= limit) return;
@@ -72119,12 +72108,47 @@ async function searchWeb(opts) {
       }
     });
   }
+  return results.slice(0, limit);
+}
+async function searchWeb(opts) {
+  const limit = Math.min(opts.limit ?? 10, 25);
+  const q = opts.query.trim();
+  if (!q) throw new Error("query required");
+  const endpoints = [
+    `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
+    `https://duckduckgo.com/html/?q=${encodeURIComponent(q)}`
+  ];
+  const errors2 = [];
+  for (const url of endpoints) {
+    try {
+      const res = await fetchUrl(url, {
+        ignoreCache: true,
+        headers: { Accept: "text/html" }
+      });
+      const results = parseResults(res.bodyText, limit);
+      if (results.length || res.status < 400) {
+        return {
+          query: q,
+          count: results.length,
+          results,
+          provider: "duckduckgo-html",
+          source: url,
+          note: "Free HTML scrape \u2014 no API key. For production SERP use Bright Data / Firecrawl / Jina with your own key beside this server."
+        };
+      }
+      errors2.push(`${url} -> empty (HTTP ${res.status})`);
+    } catch (e2) {
+      errors2.push(`${url} -> ${e2.message}`);
+    }
+  }
   return {
     query: q,
-    count: results.length,
-    results: results.slice(0, limit),
+    count: 0,
+    results: [],
     provider: "duckduckgo-html",
-    note: "Free HTML scrape \u2014 no API key. For production SERP use Bright Data / Firecrawl / Jina with your own key beside this server."
+    degraded: true,
+    errors: errors2,
+    note: "Search upstream blocked or unreachable from this host. Shape preserved for agents; try again later or plug a SERP key beside this server."
   };
 }
 var init_search = __esm({

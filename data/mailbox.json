@@ -1,6 +1,68 @@
 {
   "messages": [
     {
+      "id": "af4f5682-c689-448e-a1ac-ee538d80410a",
+      "from": "smoke-bot",
+      "to": "other-bot",
+      "body": "Smoke handoff\n\nVerify handoff shape",
+      "priority": "high",
+      "tags": [
+        "handoff"
+      ],
+      "kind": "handoff",
+      "handoff": {
+        "title": "Smoke handoff",
+        "objective": "Verify handoff shape",
+        "acceptance": "board lists it"
+      },
+      "createdAt": 1793874040748,
+      "readBy": []
+    },
+    {
+      "id": "dd00107d-aedf-4a0e-906c-9bec8bb26fef",
+      "from": "smoke-bot",
+      "room": "smoke",
+      "body": "hello from smoke v4",
+      "priority": "normal",
+      "tags": [
+        "smoke"
+      ],
+      "kind": "message",
+      "createdAt": 1793874040747,
+      "readBy": []
+    },
+    {
+      "id": "44cd0329-f570-4f2b-b654-75c9a9cc2afc",
+      "from": "smoke-bot",
+      "to": "other-bot",
+      "body": "Smoke handoff\n\nVerify handoff shape",
+      "priority": "high",
+      "tags": [
+        "handoff"
+      ],
+      "kind": "handoff",
+      "handoff": {
+        "title": "Smoke handoff",
+        "objective": "Verify handoff shape",
+        "acceptance": "board lists it"
+      },
+      "createdAt": 1793874013091,
+      "readBy": []
+    },
+    {
+      "id": "74ffbc9c-7ed0-4579-b7d5-21d06919f7e9",
+      "from": "smoke-bot",
+      "room": "smoke",
+      "body": "hello from smoke v4",
+      "priority": "normal",
+      "tags": [
+        "smoke"
+      ],
+      "kind": "message",
+      "createdAt": 1793874013090,
+      "readBy": []
+    },
+    {
       "id": "6f5a2991-9081-400f-a39f-3717ad079e6d",
       "from": "smoke-bot",
       "to": "other-bot",
@@ -67,8 +129,8 @@
     {
       "id": "smoke-bot",
       "status": "idle",
-      "lastSeen": 1793873595041
+      "lastSeen": 1793874040748
     }
   ],
-  "savedAt": 1793873595041
+  "savedAt": 1793874040748
 }
