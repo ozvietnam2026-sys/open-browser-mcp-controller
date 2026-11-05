@@ -1,0 +1,6 @@
+{
+  "name": "Open Browser MCP Controller",
+  "description": "Trình duyệt web mở với hệ thống cổng Model Context Protocol (MCP) và AI Agent tự hành điều khiển toàn quyền: mở tab, điều hướng, click, gõ phím, cuộn, đọc DOM và chụp màn hình.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
