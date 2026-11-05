@@ -25228,8 +25228,8 @@ function getConfig() {
   const envCaps = parseCaps(process.env.MCP_CAPS || process.env.OBMC_CAPS || process.env.PLAYWRIGHT_MCP_CAPS);
   const caps = runtimeCapsOverride || envCaps || profileCaps;
   return {
-    version: "4.0.0",
-    userAgent: process.env.OBMC_USER_AGENT || process.env.AGENT_BROWSER_USER_AGENT || "OpenBrowserMCP/4.0 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller; research bot)",
+    version: "4.1.0",
+    userAgent: process.env.OBMC_USER_AGENT || process.env.AGENT_BROWSER_USER_AGENT || "OpenBrowserMCP/4.1 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller; research bot)",
     proxyUrl: process.env.OBMC_PROXY || process.env.AGENT_BROWSER_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || void 0,
     proxyBypass: parseList(process.env.OBMC_PROXY_BYPASS || process.env.AGENT_BROWSER_PROXY_BYPASS || process.env.NO_PROXY),
     allowedDomains: parseList(process.env.OBMC_ALLOWED_DOMAINS || process.env.AGENT_BROWSER_ALLOWED_DOMAINS),
@@ -58214,13 +58214,13 @@ var require_mock_call_history = __commonJS({
     "use strict";
     var { kMockCallHistoryAddLog } = require_mock_symbols();
     var { InvalidArgumentError } = require_errors();
-    function handleFilterCallsWithOptions(criteria, options, handler, store2, allLogs) {
+    function handleFilterCallsWithOptions(criteria, options, handler, store3, allLogs) {
       switch (options.operator) {
         case "OR":
-          store2.push(...handler(criteria, allLogs));
-          return store2;
+          store3.push(...handler(criteria, allLogs));
+          return store3;
         case "AND":
-          return handler(criteria, store2);
+          return handler(criteria, store3);
         default:
           throw new InvalidArgumentError("options.operator must to be a case insensitive string equal to 'OR' or 'AND'");
       }
@@ -60793,12 +60793,12 @@ var require_cache = __commonJS({
       }
       return false;
     }
-    function assertCacheStore(store2, name = "CacheStore") {
-      if (typeof store2 !== "object" || store2 === null) {
-        throw new TypeError(`expected type of ${name} to be a CacheStore, got ${store2 === null ? "null" : typeof store2}`);
+    function assertCacheStore(store3, name = "CacheStore") {
+      if (typeof store3 !== "object" || store3 === null) {
+        throw new TypeError(`expected type of ${name} to be a CacheStore, got ${store3 === null ? "null" : typeof store3}`);
       }
       for (const fn of ["get", "createWriteStream", "delete"]) {
-        if (typeof store2[fn] !== "function") {
+        if (typeof store3[fn] !== "function") {
           throw new TypeError(`${name} needs to have a \`${fn}()\` function`);
         }
       }
@@ -61428,15 +61428,15 @@ var require_cache_handler = __commonJS({
       }
       return locationUrl.pathname + locationUrl.search;
     }
-    function deleteCachedUri(store2, cacheKey, path5) {
-      deleteCachedValue(store2, {
+    function deleteCachedUri(store3, cacheKey, path5) {
+      deleteCachedValue(store3, {
         ...cacheKey,
         path: path5
       });
       for (let i2 = 0; i2 < util.safeHTTPMethods.length; i2++) {
         const method = util.safeHTTPMethods[i2];
         if (method !== cacheKey.method) {
-          deleteCachedValue(store2, {
+          deleteCachedValue(store3, {
             ...cacheKey,
             method,
             path: path5
@@ -61444,7 +61444,7 @@ var require_cache_handler = __commonJS({
         }
       }
     }
-    function deleteLocationTargets(store2, cacheKey, headerValue) {
+    function deleteLocationTargets(store3, cacheKey, headerValue) {
       if (headerValue === void 0) {
         return;
       }
@@ -61452,14 +61452,14 @@ var require_cache_handler = __commonJS({
       for (let i2 = 0; i2 < values.length; i2++) {
         const path5 = getSameOriginPath(cacheKey, values[i2]);
         if (path5 !== void 0) {
-          deleteCachedUri(store2, cacheKey, path5);
+          deleteCachedUri(store3, cacheKey, path5);
         }
       }
     }
-    function invalidateUnsafeRequest(store2, cacheKey, resHeaders) {
-      deleteCachedUri(store2, cacheKey, cacheKey.path);
-      deleteLocationTargets(store2, cacheKey, resHeaders.location);
-      deleteLocationTargets(store2, cacheKey, resHeaders["content-location"]);
+    function invalidateUnsafeRequest(store3, cacheKey, resHeaders) {
+      deleteCachedUri(store3, cacheKey, cacheKey.path);
+      deleteLocationTargets(store3, cacheKey, resHeaders.location);
+      deleteLocationTargets(store3, cacheKey, resHeaders["content-location"]);
     }
     var CacheHandler = class {
       /**
@@ -61498,8 +61498,8 @@ var require_cache_handler = __commonJS({
        * @param {import('../../types/cache-interceptor.d.ts').default.CacheKey} cacheKey
        * @param {import('../../types/dispatcher.d.ts').default.DispatchHandler} handler
        */
-      constructor({ store: store2, type, cacheByDefault }, cacheKey, handler) {
-        this.#store = store2;
+      constructor({ store: store3, type, cacheByDefault }, cacheKey, handler) {
+        this.#store = store3;
         this.#cacheType = type;
         this.#cacheByDefault = cacheByDefault;
         this.#cacheKey = cacheKey;
@@ -61711,15 +61711,15 @@ var require_cache_handler = __commonJS({
         this.#handler.onResponseError?.(controller, err);
       }
     };
-    function deleteCachedValue(store2, cacheKey) {
+    function deleteCachedValue(store3, cacheKey) {
       try {
-        store2.delete(cacheKey)?.catch?.(noop3);
+        store3.delete(cacheKey)?.catch?.(noop3);
       } catch {
       }
     }
-    function deleteCachedValueIfNotModified(statusCode, store2, cacheKey) {
+    function deleteCachedValueIfNotModified(statusCode, store3, cacheKey) {
       if (statusCode === 304) {
-        deleteCachedValue(store2, cacheKey);
+        deleteCachedValue(store3, cacheKey);
       }
     }
     function revalidationResponseDisallowsCachedReuse(cacheType, resHeaders, cacheControlDirectives) {
@@ -61993,7 +61993,7 @@ var require_memory_cache_store = __commonJS({
         assertCacheKey(key2);
         assertCacheValue(val2);
         const topLevelKey = `${key2.origin}:${key2.path}`;
-        const store2 = this;
+        const store3 = this;
         const entry = { ...key2, ...val2, body: [], size: 0 };
         return new Writable({
           write(chunk, encoding, callback) {
@@ -62001,7 +62001,7 @@ var require_memory_cache_store = __commonJS({
               chunk = Buffer.from(chunk, encoding);
             }
             entry.size += chunk.byteLength;
-            if (entry.size >= store2.#maxEntrySize) {
+            if (entry.size >= store3.#maxEntrySize) {
               this.destroy();
             } else {
               entry.body.push(chunk);
@@ -62009,42 +62009,42 @@ var require_memory_cache_store = __commonJS({
             callback(null);
           },
           final(callback) {
-            let entries = store2.#entries.get(topLevelKey);
+            let entries = store3.#entries.get(topLevelKey);
             if (!entries) {
               entries = [];
-              store2.#entries.set(topLevelKey, entries);
+              store3.#entries.set(topLevelKey, entries);
             }
             const previousEntry = findEntry(key2, entries, Date.now());
             if (previousEntry) {
               const index2 = entries.indexOf(previousEntry);
               entries.splice(index2, 1, entry);
-              store2.#size -= previousEntry.size;
+              store3.#size -= previousEntry.size;
             } else {
               entries.push(entry);
-              store2.#count += 1;
+              store3.#count += 1;
             }
-            store2.#size += entry.size;
-            if (store2.#size > store2.#maxSize || store2.#count > store2.#maxCount) {
-              if (!store2.#hasEmittedMaxSizeEvent) {
-                store2.emit("maxSizeExceeded", {
-                  size: store2.#size,
-                  maxSize: store2.#maxSize,
-                  count: store2.#count,
-                  maxCount: store2.#maxCount
+            store3.#size += entry.size;
+            if (store3.#size > store3.#maxSize || store3.#count > store3.#maxCount) {
+              if (!store3.#hasEmittedMaxSizeEvent) {
+                store3.emit("maxSizeExceeded", {
+                  size: store3.#size,
+                  maxSize: store3.#maxSize,
+                  count: store3.#count,
+                  maxCount: store3.#maxCount
                 });
-                store2.#hasEmittedMaxSizeEvent = true;
+                store3.#hasEmittedMaxSizeEvent = true;
               }
-              for (const [key3, entries2] of store2.#entries) {
+              for (const [key3, entries2] of store3.#entries) {
                 for (const entry2 of entries2.splice(0, entries2.length / 2)) {
-                  store2.#size -= entry2.size;
-                  store2.#count -= 1;
+                  store3.#size -= entry2.size;
+                  store3.#count -= 1;
                 }
                 if (entries2.length === 0) {
-                  store2.#entries.delete(key3);
+                  store3.#entries.delete(key3);
                 }
               }
-              if (store2.#size < store2.#maxSize && store2.#count < store2.#maxCount) {
-                store2.#hasEmittedMaxSizeEvent = false;
+              if (store3.#size < store3.#maxSize && store3.#count < store3.#maxCount) {
+                store3.#hasEmittedMaxSizeEvent = false;
               }
             }
             callback(null);
@@ -62285,9 +62285,9 @@ var require_cache2 = __commonJS({
     function revalidationResponseUpdatesCacheControl(headers) {
       return headers["cache-control"] !== void 0;
     }
-    function deleteCachedValue(store2, cacheKey) {
+    function deleteCachedValue(store3, cacheKey) {
       try {
-        store2.delete(cacheKey)?.catch?.(nop);
+        store3.delete(cacheKey)?.catch?.(nop);
       } catch {
       }
     }
@@ -62519,7 +62519,7 @@ var require_cache2 = __commonJS({
     }
     module.exports = (opts = {}) => {
       const {
-        store: store2 = new MemoryCacheStore(),
+        store: store3 = new MemoryCacheStore(),
         methods = ["GET"],
         cacheByDefault = void 0,
         type = "shared",
@@ -62528,7 +62528,7 @@ var require_cache2 = __commonJS({
       if (typeof opts !== "object" || opts === null) {
         throw new TypeError(`expected type of opts to be an Object, got ${opts === null ? "null" : typeof opts}`);
       }
-      assertCacheStore(store2, "opts.store");
+      assertCacheStore(store3, "opts.store");
       assertCacheMethods(methods, "opts.methods");
       assertCacheOrigins(origins, "opts.origins");
       if (typeof cacheByDefault !== "undefined" && typeof cacheByDefault !== "number") {
@@ -62538,7 +62538,7 @@ var require_cache2 = __commonJS({
         throw new TypeError(`expected opts.type to be shared, private, or undefined, got ${typeof type}`);
       }
       const globalOpts = {
-        store: store2,
+        store: store3,
         methods,
         cacheByDefault,
         type
@@ -62586,7 +62586,7 @@ var require_cache2 = __commonJS({
           if (!arrayIncludes(util.safeHTTPMethods, opts2.method)) {
             return dispatch(opts2, new CacheHandler(globalOpts, cacheKey, handler));
           }
-          const result = store2.get(cacheKey);
+          const result = store3.get(cacheKey);
           if (result && typeof result.then === "function") {
             return result.then((result2) => handleResult(
               dispatch,
@@ -63813,12 +63813,12 @@ var require_sqlite_cache_store = __commonJS({
         assertCacheValue(value);
         let size = 0;
         const body = [];
-        const store2 = this;
+        const store3 = this;
         return new Writable({
           decodeStrings: true,
           write(chunk, encoding, callback) {
             size += chunk.byteLength;
-            if (size < store2.#maxEntrySize) {
+            if (size < store3.#maxEntrySize) {
               body.push(chunk);
             } else {
               this.destroy();
@@ -63826,7 +63826,7 @@ var require_sqlite_cache_store = __commonJS({
             callback();
           },
           final(callback) {
-            store2.set(key2, { ...value, body });
+            store3.set(key2, { ...value, body });
             callback();
           }
         });
@@ -72080,7 +72080,7 @@ var init_map = __esm({
 });
 
 // server/extract/search.ts
-function parseResults(html3, limit) {
+function parseDdgResults(html3, limit) {
   const $2 = loadHtml(html3);
   const results = [];
   $2(".result").each((_, el) => {
@@ -72110,10 +72110,104 @@ function parseResults(html3, limit) {
   }
   return results.slice(0, limit);
 }
-async function searchWeb(opts) {
-  const limit = Math.min(opts.limit ?? 10, 25);
-  const q = opts.query.trim();
-  if (!q) throw new Error("query required");
+async function searchTavily(q, limit) {
+  const key2 = process.env.TAVILY_API_KEY;
+  if (!key2) return null;
+  const res = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      api_key: key2,
+      query: q,
+      max_results: Math.min(limit, 10),
+      include_answer: false,
+      search_depth: "basic"
+    })
+  });
+  const json = await res.json();
+  if (!res.ok) throw new Error(`tavily ${res.status}: ${json?.detail || json?.error || JSON.stringify(json).slice(0, 200)}`);
+  const results = (json.results || []).map((r2) => ({
+    title: r2.title || r2.url,
+    url: r2.url,
+    snippet: r2.content || r2.snippet || ""
+  }));
+  return {
+    query: q,
+    count: results.length,
+    results: results.slice(0, limit),
+    provider: "tavily",
+    source: "https://api.tavily.com/search",
+    note: "Tavily free tier \u2014 auto-enabled via TAVILY_API_KEY."
+  };
+}
+async function searchJina(q, limit, withKey) {
+  const key2 = process.env.JINA_API_KEY;
+  if (withKey && !key2) return null;
+  const url = `https://s.jina.ai/${encodeURIComponent(q)}`;
+  const headers = {
+    Accept: "application/json",
+    "X-Return-Format": "json"
+  };
+  if (key2) headers.Authorization = `Bearer ${key2}`;
+  const res = await fetch(url, { headers });
+  const text3 = await res.text();
+  if (!res.ok) {
+    throw new Error(`jina ${res.status}: ${text3.slice(0, 220)}`);
+  }
+  let results = [];
+  try {
+    const json = JSON.parse(text3);
+    const data2 = json.data || json.results || json;
+    if (Array.isArray(data2)) {
+      results = data2.slice(0, limit).map((r2) => ({
+        title: r2.title || r2.url || "result",
+        url: r2.url || r2.link || "",
+        snippet: (r2.description || r2.content || r2.snippet || "").toString().slice(0, 400)
+      }));
+    }
+  } catch {
+    const lines = text3.split("\n");
+    for (const line of lines) {
+      if (results.length >= limit) break;
+      const m2 = line.match(/\[([^\]]+)\]\((https?:\/\/[^)]+)\)/);
+      if (m2) results.push({ title: m2[1], url: m2[2], snippet: "" });
+    }
+  }
+  results = results.filter((r2) => r2.url);
+  return {
+    query: q,
+    count: results.length,
+    results,
+    provider: key2 ? "jina-search" : "jina-search-keyless",
+    source: url,
+    note: key2 ? "Jina s.jina.ai \u2014 auto-enabled via JINA_API_KEY." : "Jina keyless probe (often 401 from datacenter IPs)."
+  };
+}
+async function searchWikipedia(q, limit) {
+  const url = `https://en.wikipedia.org/w/api.php?action=opensearch&search=${encodeURIComponent(q)}&limit=${Math.min(limit, 10)}&namespace=0&format=json`;
+  const res = await fetch(url, {
+    headers: { Accept: "application/json", "User-Agent": "OpenBrowserMCP/4.1 (research; +https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)" }
+  });
+  if (!res.ok) throw new Error(`wikipedia ${res.status}`);
+  const data2 = await res.json();
+  const titles = data2[1] || [];
+  const snippets = data2[2] || [];
+  const urls = data2[3] || [];
+  const results = titles.map((title, i2) => ({
+    title,
+    url: urls[i2],
+    snippet: snippets[i2] || ""
+  }));
+  return {
+    query: q,
+    count: results.length,
+    results: results.slice(0, limit),
+    provider: "wikipedia-opensearch",
+    source: url,
+    note: "Keyless Wikipedia OpenSearch fallback (encyclopedia scope, not a full SERP)."
+  };
+}
+async function searchDdg(q, limit) {
   const endpoints = [
     `https://html.duckduckgo.com/html/?q=${encodeURIComponent(q)}`,
     `https://duckduckgo.com/html/?q=${encodeURIComponent(q)}`
@@ -72125,7 +72219,7 @@ async function searchWeb(opts) {
         ignoreCache: true,
         headers: { Accept: "text/html" }
       });
-      const results = parseResults(res.bodyText, limit);
+      const results = parseDdgResults(res.bodyText, limit);
       if (results.length || res.status < 400) {
         return {
           query: q,
@@ -72133,7 +72227,7 @@ async function searchWeb(opts) {
           results,
           provider: "duckduckgo-html",
           source: url,
-          note: "Free HTML scrape \u2014 no API key. For production SERP use Bright Data / Firecrawl / Jina with your own key beside this server."
+          note: "Free HTML scrape \u2014 no API key. Datacenter IPs often get 403."
         };
       }
       errors2.push(`${url} -> empty (HTTP ${res.status})`);
@@ -72147,8 +72241,69 @@ async function searchWeb(opts) {
     results: [],
     provider: "duckduckgo-html",
     degraded: true,
+    errors: errors2
+  };
+}
+async function searchWeb(opts) {
+  const limit = Math.min(opts.limit ?? 10, 25);
+  const q = opts.query.trim();
+  if (!q) throw new Error("query required");
+  const providerPref = (process.env.SEARCH_PROVIDER || "auto").toLowerCase();
+  const tried = [];
+  const errors2 = [];
+  const force = (name) => providerPref === name;
+  const auto = providerPref === "auto";
+  const tryOne = async (label, fn) => {
+    if (!auto && !force(label) && !(label.startsWith("jina") && force("jina"))) return null;
+    tried.push(label);
+    try {
+      const r2 = await fn();
+      if (r2 && r2.count > 0) return { ...r2, tried };
+      if (r2 && r2.degraded) errors2.push(...r2.errors || [`${label}: empty`]);
+      else if (r2) errors2.push(`${label}: 0 results`);
+    } catch (e2) {
+      errors2.push(`${label}: ${e2.message}`);
+    }
+    return null;
+  };
+  if (auto || force("tavily")) {
+    const r2 = await tryOne("tavily", () => searchTavily(q, limit));
+    if (r2) return r2;
+  }
+  if (auto || force("jina")) {
+    if (process.env.JINA_API_KEY) {
+      const r2 = await tryOne("jina", () => searchJina(q, limit, true));
+      if (r2) return r2;
+    } else if (auto) {
+      const r2 = await tryOne("jina-keyless", () => searchJina(q, limit, false));
+      if (r2 && r2.count > 0) return r2;
+    }
+  }
+  if (auto || force("wikipedia")) {
+    const r2 = await tryOne("wikipedia", () => searchWikipedia(q, limit));
+    if (r2) return r2;
+  }
+  if (auto || force("duckduckgo") || force("ddg")) {
+    const r2 = await tryOne("duckduckgo", async () => searchDdg(q, limit));
+    if (r2 && r2.count > 0) return r2;
+    if (r2) errors2.push(...r2.errors || []);
+  }
+  const howTo = [
+    "All search providers returned empty or were blocked from this host.",
+    "Set TAVILY_API_KEY (free, no card: https://tavily.com) \u2014 recommended on Vercel.",
+    "Or set JINA_API_KEY (https://jina.ai/?sui=apikey) for s.jina.ai.",
+    "Optional: SEARCH_PROVIDER=tavily|jina|wikipedia|duckduckgo to force one.",
+    "s.jina.ai keyless is blocked from most datacenter IPs (401 AuthenticationRequired)."
+  ].join(" ");
+  return {
+    query: q,
+    count: 0,
+    results: [],
+    provider: "none",
+    degraded: true,
     errors: errors2,
-    note: "Search upstream blocked or unreachable from this host. Shape preserved for agents; try again later or plug a SERP key beside this server."
+    tried,
+    note: howTo
   };
 }
 var init_search = __esm({
@@ -72158,29 +72313,246 @@ var init_search = __esm({
   }
 });
 
-// server/extract/change-store.ts
+// server/infra/persist-store.ts
 import fs from "fs";
 import path from "path";
-import crypto2 from "crypto";
-function storePath() {
-  const p = getConfig().changeStorePath;
-  if (process.env.VERCEL) return path.join("/tmp", "obmc-change-store.json");
-  return path.resolve(p);
+function redisEnvPresent() {
+  return Boolean(process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN);
 }
-function load2() {
+function describePersistBackend() {
+  if (redisEnvPresent()) {
+    return {
+      backend: "upstash-redis",
+      redisConfigured: true,
+      note: "UPSTASH_REDIS_REST_URL/TOKEN detected \u2014 durable across cold starts."
+    };
+  }
+  if (process.env.VERCEL) {
+    return {
+      backend: "memory",
+      redisConfigured: false,
+      note: "Vercel without Upstash \u2014 ephemeral per warm instance. Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (free at console.upstash.com)."
+    };
+  }
+  return {
+    backend: "file",
+    redisConfigured: false,
+    note: "File-backed on long-running host (Docker/local)."
+  };
+}
+function getPersistStore(opts) {
+  if (cached) return cached;
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (url && token) {
+    cached = new UpstashRedisStore(url.replace(/\/$/, ""), token);
+    return cached;
+  }
+  if (opts?.filePath && !process.env.VERCEL) {
+    cached = new FileStore(opts.filePath);
+    return cached;
+  }
+  if (process.env.VERCEL) {
+    cached = new MemoryStore();
+    return cached;
+  }
+  if (opts?.filePath) {
+    cached = new FileStore(opts.filePath);
+    return cached;
+  }
+  cached = new MemoryStore();
+  return cached;
+}
+function namespacedKey(ns, key2) {
+  return `obmc:${ns}:${key2}`;
+}
+var MemoryStore, FileStore, UpstashRedisStore, cached;
+var init_persist_store = __esm({
+  "server/infra/persist-store.ts"() {
+    MemoryStore = class {
+      constructor() {
+        this.backend = "memory";
+        this.map = /* @__PURE__ */ new Map();
+      }
+      async get(key2) {
+        const e2 = this.map.get(key2);
+        if (!e2) return null;
+        if (e2.exp && Date.now() > e2.exp) {
+          this.map.delete(key2);
+          return null;
+        }
+        return e2.v;
+      }
+      async set(key2, value, ttlSec) {
+        this.map.set(key2, { v: value, exp: ttlSec ? Date.now() + ttlSec * 1e3 : void 0 });
+      }
+      async del(key2) {
+        this.map.delete(key2);
+      }
+      async getJson(key2) {
+        const raw = await this.get(key2);
+        if (!raw) return null;
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      }
+      async setJson(key2, value, ttlSec) {
+        await this.set(key2, JSON.stringify(value), ttlSec);
+      }
+    };
+    FileStore = class {
+      constructor(filePath) {
+        this.filePath = filePath;
+        this.backend = "file";
+      }
+      readAll() {
+        try {
+          const resolved = path.resolve(this.filePath);
+          if (!fs.existsSync(resolved)) return {};
+          return JSON.parse(fs.readFileSync(resolved, "utf8"));
+        } catch {
+          return {};
+        }
+      }
+      writeAll(data2) {
+        try {
+          const resolved = path.resolve(this.filePath);
+          fs.mkdirSync(path.dirname(resolved), { recursive: true });
+          fs.writeFileSync(resolved, JSON.stringify(data2));
+        } catch {
+        }
+      }
+      async get(key2) {
+        const all = this.readAll();
+        const e2 = all[key2];
+        if (!e2) return null;
+        if (e2.exp && Date.now() > e2.exp) {
+          delete all[key2];
+          this.writeAll(all);
+          return null;
+        }
+        return e2.v;
+      }
+      async set(key2, value, ttlSec) {
+        const all = this.readAll();
+        all[key2] = { v: value, exp: ttlSec ? Date.now() + ttlSec * 1e3 : void 0 };
+        this.writeAll(all);
+      }
+      async del(key2) {
+        const all = this.readAll();
+        delete all[key2];
+        this.writeAll(all);
+      }
+      async getJson(key2) {
+        const raw = await this.get(key2);
+        if (!raw) return null;
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      }
+      async setJson(key2, value, ttlSec) {
+        await this.set(key2, JSON.stringify(value), ttlSec);
+      }
+    };
+    UpstashRedisStore = class {
+      constructor(url, token) {
+        this.url = url;
+        this.token = token;
+        this.backend = "upstash-redis";
+      }
+      async cmd(...args) {
+        const res = await fetch(this.url, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${this.token}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify(args.map(String))
+        });
+        if (!res.ok) {
+          const text3 = await res.text().catch(() => "");
+          throw new Error(`Upstash ${res.status}: ${text3.slice(0, 200)}`);
+        }
+        const json = await res.json();
+        return json.result ?? null;
+      }
+      async get(key2) {
+        try {
+          const r2 = await this.cmd("GET", key2);
+          return r2 == null ? null : String(r2);
+        } catch {
+          return null;
+        }
+      }
+      async set(key2, value, ttlSec) {
+        try {
+          if (ttlSec && ttlSec > 0) await this.cmd("SET", key2, value, "EX", ttlSec);
+          else await this.cmd("SET", key2, value);
+        } catch {
+        }
+      }
+      async del(key2) {
+        try {
+          await this.cmd("DEL", key2);
+        } catch {
+        }
+      }
+      async getJson(key2) {
+        const raw = await this.get(key2);
+        if (!raw) return null;
+        try {
+          return JSON.parse(raw);
+        } catch {
+          return null;
+        }
+      }
+      async setJson(key2, value, ttlSec) {
+        await this.set(key2, JSON.stringify(value), ttlSec);
+      }
+    };
+    cached = null;
+  }
+});
+
+// server/extract/change-store.ts
+import fs2 from "fs";
+import path2 from "path";
+import crypto2 from "crypto";
+function fileFallbackPath() {
+  const p = getConfig().changeStorePath;
+  if (process.env.VERCEL && !redisEnvPresent()) return path2.join("/tmp", "obmc-change-store.json");
+  return path2.resolve(p);
+}
+async function load2() {
+  const store3 = getPersistStore({ filePath: fileFallbackPath() });
+  if (redisEnvPresent() || store3.backend !== "memory") {
+    const raw = await store3.getJson(STORE_KEY);
+    if (raw) return raw;
+  }
   try {
-    const raw = fs.readFileSync(storePath(), "utf8");
+    const raw = fs2.readFileSync(fileFallbackPath(), "utf8");
     return JSON.parse(raw);
   } catch {
     return {};
   }
 }
-function save(store2) {
+async function save(data2) {
+  const store3 = getPersistStore({ filePath: fileFallbackPath() });
   try {
-    const p = storePath();
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, JSON.stringify(store2));
+    await store3.setJson(STORE_KEY, data2);
   } catch {
+  }
+  if (!redisEnvPresent() && !process.env.VERCEL) {
+    try {
+      const p = fileFallbackPath();
+      fs2.mkdirSync(path2.dirname(p), { recursive: true });
+      fs2.writeFileSync(p, JSON.stringify(data2));
+    } catch {
+    }
   }
 }
 function key(url, tag) {
@@ -72206,27 +72578,32 @@ function lineDiff(prev2, next2, maxLines = 80) {
   if (out.length >= maxLines) out.push("\u2026[diff truncated]");
   return out.join("\n");
 }
-function trackChange(opts) {
+async function trackChange(opts) {
   const tag = opts.tag || "default";
-  const store2 = load2();
+  const store3 = await load2();
   const k = key(opts.url, tag);
   const hash = hashText(opts.markdown);
-  const prev2 = store2[k];
-  store2[k] = { url: opts.url, tag, hash, markdown: opts.markdown.slice(0, 2e5), at: Date.now() };
-  save(store2);
-  if (!prev2) return { status: "new", hash };
-  if (prev2.hash === hash) return { status: "same", hash, previousHash: prev2.hash, previousAt: prev2.at };
+  const prev2 = store3[k];
+  store3[k] = { url: opts.url, tag, hash, markdown: opts.markdown.slice(0, 2e5), at: Date.now() };
+  await save(store3);
+  const backend = describePersistBackend().backend;
+  if (!prev2) return { status: "new", hash, persistBackend: backend };
+  if (prev2.hash === hash) return { status: "same", hash, previousHash: prev2.hash, previousAt: prev2.at, persistBackend: backend };
   return {
     status: "changed",
     hash,
     previousHash: prev2.hash,
     previousAt: prev2.at,
-    diff: lineDiff(prev2.markdown, opts.markdown)
+    diff: lineDiff(prev2.markdown, opts.markdown),
+    persistBackend: backend
   };
 }
+var STORE_KEY;
 var init_change_store = __esm({
   "server/extract/change-store.ts"() {
     init_config();
+    init_persist_store();
+    STORE_KEY = namespacedKey("change", "store");
   }
 });
 
@@ -72443,7 +72820,7 @@ async function executeExtractTool(name, args) {
       const res = await fetchUrl(args.url, { ignoreCache: true });
       const $2 = loadHtml(res.bodyText);
       const readable = extractReadable($2, res.finalUrl);
-      const change = trackChange({
+      const change = await trackChange({
         url: res.finalUrl,
         markdown: readable.contentMarkdown || "",
         tag: args.tag
@@ -72768,14 +73145,57 @@ async function loadPlaywright() {
     throw new Error(playwrightUnavailableMessage("playwright"));
   }
   if (pwModule) return pwModule;
+  const prefer = (process.env.PLAYWRIGHT_ENGINE || process.env.OBMC_BROWSER_ENGINE || "playwright").toLowerCase();
+  if (prefer === "patchright") {
+    try {
+      const mod = await Function('return import("patchright")')();
+      pwModule = mod;
+      engineName = "patchright";
+      return pwModule;
+    } catch (err) {
+      console.warn(`[obmc] patchright not installed (${err?.message || err}); falling back to playwright`);
+    }
+  }
   try {
     pwModule = await import("playwright");
+    engineName = "playwright";
     return pwModule;
   } catch (err) {
     throw new Error(
       `Playwright is not installed. ${playwrightUnavailableMessage("playwright")} (${err?.message || err})`
     );
   }
+}
+function getBrowserEngine() {
+  return engineName;
+}
+function stealthLaunchArgs() {
+  const base = ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"];
+  if (process.env.OBMC_STEALTHISH !== "1") return base;
+  return [
+    ...base,
+    "--disable-blink-features=AutomationControlled",
+    "--disable-features=IsolateOrigins,site-per-process",
+    "--lang=en-US,en"
+  ];
+}
+async function stealthInitScripts(ctx) {
+  if (process.env.OBMC_STEALTHISH !== "1") return;
+  await ctx.addInitScript(() => {
+    try {
+      Object.defineProperty(navigator, "webdriver", { get: () => void 0 });
+      const w = window;
+      w.chrome = w.chrome || { runtime: {} };
+      Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"] });
+      Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
+    } catch {
+    }
+  });
+}
+function videoDir() {
+  if (process.env.OBMC_VIDEO !== "1" && process.env.PW_VIDEO !== "1") return void 0;
+  const dir = process.env.OBMC_OUTPUT_DIR || "./data/output";
+  return `${dir.replace(/\/$/, "")}/video`;
 }
 function hookNetwork(p) {
   if (networkHooked) return;
@@ -72879,13 +73299,16 @@ async function getPage() {
       context = await pw.chromium.launchPersistentContext(userDataDir, {
         headless: process.env.PLAYWRIGHT_HEADED !== "1",
         args: [
-          "--no-sandbox",
-          "--disable-setuid-sandbox",
+          ...stealthLaunchArgs(),
           "--password-store=basic",
           "--use-mock-keychain"
         ],
-        viewport: { width: 1280, height: 720 }
+        viewport: { width: 1280, height: 720 },
+        recordVideo: videoDir() ? { dir: videoDir() } : void 0,
+        ignoreHTTPSErrors: process.env.OBMC_IGNORE_HTTPS_ERRORS === "1",
+        proxy: process.env.OBMC_PROXY ? { server: process.env.OBMC_PROXY } : void 0
       });
+      await stealthInitScripts(context);
       connectionMode = "persistent";
       browser = context.browser();
       const pages = context.pages();
@@ -72895,17 +73318,23 @@ async function getPage() {
     } else {
       browser = await pw.chromium.launch({
         headless: process.env.PLAYWRIGHT_HEADED !== "1",
-        args: ["--no-sandbox", "--disable-setuid-sandbox"],
+        args: stealthLaunchArgs(),
         executablePath: process.env.CHROME_EXECUTABLE_PATH || void 0
       });
       connectionMode = "launch";
     }
   }
   if (!context) {
+    const { getConfig: getConfig2 } = await Promise.resolve().then(() => (init_config(), config_exports));
+    const cfg = getConfig2();
     context = await browser.newContext({
       viewport: { width: 1280, height: 720 },
-      userAgent: "OpenBrowserMCP-Playwright/4.0 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)"
+      userAgent: cfg.userAgent || "OpenBrowserMCP-Playwright/4.1 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)",
+      ignoreHTTPSErrors: cfg.ignoreHttpsErrors,
+      proxy: cfg.proxyUrl ? { server: cfg.proxyUrl, bypass: cfg.proxyBypass.join(",") || void 0 } : void 0,
+      recordVideo: videoDir() ? { dir: videoDir() } : void 0
     });
+    await stealthInitScripts(context);
   }
   if (!page || page.isClosed()) {
     page = await context.newPage();
@@ -72940,7 +73369,10 @@ async function closePlaywright(opts = {}) {
   consoleHooked = false;
   performanceTracing = false;
   connectionMode = "launch";
-  if (!opts.keepModule) pwModule = null;
+  if (!opts.keepModule) {
+    pwModule = null;
+    engineName = "playwright";
+  }
 }
 function escapeCss(s2) {
   return s2.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
@@ -72949,7 +73381,33 @@ async function buildA11ySnapshot(options = {}) {
   const p = await getPage();
   const maxNodes = options.maxNodes ?? 200;
   const maxDepth = options.maxDepth ?? 12;
-  const snapshot = await p.accessibility.snapshot({ interestingOnly: options.interactiveOnly !== false });
+  const pageAny = p;
+  let snapshot = null;
+  if (pageAny.accessibility?.snapshot) {
+    snapshot = await pageAny.accessibility.snapshot({ interestingOnly: options.interactiveOnly !== false });
+  } else if (typeof pageAny.locator === "function") {
+    try {
+      const aria = pageAny.locator("body").ariaSnapshot ? await pageAny.locator("body").ariaSnapshot() : null;
+      if (typeof aria === "string") {
+        snapshot = { role: "WebArea", name: await p.title(), children: [{ role: "generic", name: aria.slice(0, 4e3) }] };
+      }
+    } catch {
+      snapshot = null;
+    }
+  }
+  if (!snapshot) {
+    snapshot = {
+      role: "WebArea",
+      name: await p.title(),
+      children: await p.$$eval(
+        "a,button,input,textarea,select,[role],[tabindex]",
+        (els) => els.slice(0, 120).map((el) => ({
+          role: el.getAttribute("role") || el.tagName.toLowerCase(),
+          name: (el.getAttribute("aria-label") || el.innerText || "").trim().slice(0, 80)
+        }))
+      )
+    };
+  }
   refMap.clear();
   const lines = [];
   let counter = 0;
@@ -73122,17 +73580,42 @@ async function startPerformanceTrace() {
 }
 async function stopPerformanceTrace() {
   const metrics = await collectPerformanceMetrics();
+  let tracePath;
   if (performanceTracing) {
     try {
-      await page?.context().tracing.stop();
+      const fs5 = await import("fs");
+      const path5 = await import("path");
+      const outDir = process.env.OBMC_OUTPUT_DIR || "./data/output";
+      fs5.mkdirSync(path5.resolve(outDir), { recursive: true });
+      tracePath = path5.resolve(outDir, `trace-${Date.now()}.zip`);
+      await page?.context().tracing.stop({ path: tracePath });
     } catch {
+      try {
+        await page?.context().tracing.stop();
+      } catch {
+      }
     }
   }
   performanceTracing = false;
   return {
     ok: true,
-    message: "Performance trace stopped. Lab metrics below (chrome-devtools-mcp style insights lite).",
-    metrics
+    message: tracePath ? `Playwright trace saved to ${tracePath}. Open with: npx playwright show-trace <path>` : "Performance trace stopped (no zip written \u2014 set OBMC_OUTPUT_DIR on Docker/local). Lab metrics below.",
+    metrics,
+    tracePath
+  };
+}
+async function startTrace() {
+  return startPerformanceTrace();
+}
+async function stopTrace() {
+  return stopPerformanceTrace();
+}
+async function videoStatus() {
+  const dir = videoDir();
+  return {
+    enabled: Boolean(dir),
+    dir: dir || null,
+    note: dir ? "Context recordVideo is on (OBMC_VIDEO=1). Close page/context to finalize .webm under dir." : "Set OBMC_VIDEO=1 (Docker/local) to record Playwright videos under OBMC_OUTPUT_DIR/video."
   };
 }
 async function evaluateScript(script) {
@@ -73262,13 +73745,15 @@ async function loadStorageState(filePath) {
   await closePlaywright({ keepModule: true });
   browser = await pw.chromium.launch({
     headless: process.env.PLAYWRIGHT_HEADED !== "1",
-    args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    args: stealthLaunchArgs()
   });
   connectionMode = "launch";
   context = await browser.newContext({
     storageState: state,
-    viewport: { width: 1280, height: 720 }
+    viewport: { width: 1280, height: 720 },
+    recordVideo: videoDir() ? { dir: videoDir() } : void 0
   });
+  await stealthInitScripts(context);
   page = await context.newPage();
   networkHooked = false;
   consoleHooked = false;
@@ -73412,7 +73897,7 @@ async function highlightRef(ref) {
   });
   return { ok: true, ref };
 }
-var pwModule, browser, context, page, connectionMode, refMap, networkLog, networkCounter, networkHooked, consoleLog, consoleCounter, consoleHooked, performanceTracing, lastSnapshotText, dialogHandlerInstalled, lastDialog, dialogAutoAccept, routes;
+var pwModule, browser, context, page, connectionMode, refMap, networkLog, networkCounter, networkHooked, consoleLog, consoleCounter, consoleHooked, performanceTracing, engineName, lastSnapshotText, dialogHandlerInstalled, lastDialog, dialogAutoAccept, routes;
 var init_runtime = __esm({
   "server/playwright/runtime.ts"() {
     pwModule = null;
@@ -73428,6 +73913,7 @@ var init_runtime = __esm({
     consoleCounter = 0;
     consoleHooked = false;
     performanceTracing = false;
+    engineName = "playwright";
     lastSnapshotText = "";
     dialogHandlerInstalled = false;
     lastDialog = null;
@@ -73669,6 +74155,9 @@ ${snap.snapshot.slice(0, 4e3)}`);
         return textResult(
           JSON.stringify(
             {
+              engine: getBrowserEngine(),
+              stealthish: process.env.OBMC_STEALTHISH === "1",
+              video: process.env.OBMC_VIDEO === "1" || process.env.PW_VIDEO === "1",
               mode: getConnectionMode(),
               available: playwrightAvailable(),
               url,
@@ -73777,6 +74266,15 @@ ${snap.snapshot.slice(0, 4e3)}`);
         return textResult(JSON.stringify(await mouseMoveXY(Number(args.x), Number(args.y)), null, 2));
       case "pw_highlight":
         return textResult(JSON.stringify(await highlightRef(args.ref), null, 2));
+      case "pw_trace_start": {
+        return textResult(JSON.stringify(await startTrace(), null, 2));
+      }
+      case "pw_trace_stop": {
+        return textResult(JSON.stringify(await stopTrace(), null, 2));
+      }
+      case "pw_video_status": {
+        return textResult(JSON.stringify(await videoStatus(), null, 2));
+      }
       case "pw_close": {
         await closePlaywright();
         return textResult("Playwright browser closed / CDP detached.");
@@ -74015,8 +74513,23 @@ var init_tools = __esm({
         }
       },
       {
+        name: "pw_trace_start",
+        description: "Start Playwright context tracing (screenshots+snapshots). Docker/local only. Pair with pw_trace_stop for a ZIP artifact.",
+        inputSchema: { type: "object", properties: {} }
+      },
+      {
+        name: "pw_trace_stop",
+        description: "Stop tracing and write ZIP under OBMC_OUTPUT_DIR (open with npx playwright show-trace). Docker/local only.",
+        inputSchema: { type: "object", properties: {} }
+      },
+      {
+        name: "pw_video_status",
+        description: "Show whether Playwright recordVideo is enabled (set OBMC_VIDEO=1 on Docker). Videos finalize when page/context closes.",
+        inputSchema: { type: "object", properties: {} }
+      },
+      {
         name: "pw_status",
-        description: "Show Playwright connection mode (launch|cdp|persistent) and current page URL.",
+        description: "Show Playwright connection mode (launch|cdp|persistent), engine (playwright|patchright), and current page URL.",
         inputSchema: { type: "object", properties: {} }
       },
       {
@@ -74233,8 +74746,6 @@ var init_tools = __esm({
 
 // server/mailbox/index.ts
 import { randomUUID } from "crypto";
-import fs2 from "fs";
-import path2 from "path";
 function persistPath() {
   try {
     return getConfig().mailPersistPath;
@@ -74242,13 +74753,15 @@ function persistPath() {
     return process.env.MAIL_PERSIST_PATH || (process.env.VERCEL ? void 0 : "./data/mailbox.json");
   }
 }
-function loadPersisted() {
-  const file = persistPath();
-  if (!file) return;
+function store2() {
+  return getPersistStore({ filePath: persistPath() || "./data/mailbox-kv.json" });
+}
+async function loadPersisted() {
   try {
-    const resolved = path2.resolve(file);
-    if (!fs2.existsSync(resolved)) return;
-    const raw = JSON.parse(fs2.readFileSync(resolved, "utf8"));
+    const raw = await store2().getJson(MAIL_KEY);
+    if (!raw) {
+      return;
+    }
     messages.length = 0;
     for (const m2 of raw.messages || []) {
       messages.push({
@@ -74263,31 +74776,31 @@ function loadPersisted() {
   } catch {
   }
 }
-function savePersisted() {
-  const file = persistPath();
-  if (!file) return;
+async function savePersisted() {
   try {
-    const resolved = path2.resolve(file);
-    fs2.mkdirSync(path2.dirname(resolved), { recursive: true });
-    fs2.writeFileSync(
-      resolved,
-      JSON.stringify(
-        {
-          messages: messages.map((m2) => ({ ...m2, readBy: [...m2.readBy] })),
-          agents: [...agents.values()],
-          savedAt: Date.now()
-        },
-        null,
-        2
-      )
-    );
+    await store2().setJson(MAIL_KEY, {
+      messages: messages.map((m2) => ({ ...m2, readBy: [...m2.readBy] })),
+      agents: [...agents.values()],
+      savedAt: Date.now()
+    });
   } catch {
   }
 }
-function ensureHydrated() {
+async function ensureHydrated() {
   if (hydrated) return;
-  hydrated = true;
-  loadPersisted();
+  if (!hydratePromise) {
+    hydratePromise = loadPersisted().then(() => {
+      hydrated = true;
+    });
+  }
+  await hydratePromise;
+}
+function platformLabel() {
+  const desc = describePersistBackend();
+  if (desc.backend === "upstash-redis") return "vercel-redis";
+  if (process.env.VERCEL) return "vercel-ephemeral";
+  if (persistPath()) return "docker-file";
+  return "long-running-memory";
 }
 function textResult2(data2) {
   return { content: [{ type: "text", text: typeof data2 === "string" ? data2 : JSON.stringify(data2, null, 2) }] };
@@ -74317,22 +74830,25 @@ function touchAgent(id) {
     lastSeen: Date.now()
   });
 }
-function pushMessage(msg) {
-  ensureHydrated();
+async function pushMessage(msg) {
+  await ensureHydrated();
   messages.unshift(msg);
   if (messages.length > MAX_MESSAGES) messages.length = MAX_MESSAGES;
-  savePersisted();
+  await savePersisted();
 }
 async function executeMailTool(name, args) {
-  ensureHydrated();
+  await ensureHydrated();
   switch (name) {
     case "mail_whoami": {
       const id = args.agentId || process.env.MAIL_AGENT_ID || `agent-${process.pid}`;
       touchAgent(id);
+      const desc = describePersistBackend();
       return textResult2({
         agentId: id,
-        platform: process.env.VERCEL ? "vercel-ephemeral" : "long-running",
-        note: persistPath() ? `Persisting to ${persistPath()} (file). On Vercel without writable FS, state is warm-instance only.` : "On Vercel, mailbox state is per warm instance only. Set MAIL_PERSIST_PATH for Docker file persistence.",
+        platform: platformLabel(),
+        persistBackend: desc.backend,
+        redisConfigured: redisEnvPresent(),
+        note: desc.note,
         persistPath: persistPath() || null
       });
     }
@@ -74342,7 +74858,7 @@ async function executeMailTool(name, args) {
         status: args.status || "idle",
         lastSeen: Date.now()
       });
-      savePersisted();
+      await savePersisted();
       return textResult2({ ok: true, agent: agents.get(args.agentId) });
     }
     case "mail_post": {
@@ -74359,7 +74875,7 @@ async function executeMailTool(name, args) {
         createdAt: Date.now(),
         readBy: /* @__PURE__ */ new Set()
       };
-      pushMessage(msg);
+      await pushMessage(msg);
       return textResult2({ ok: true, message: serialize3(msg) });
     }
     case "mail_handoff": {
@@ -74383,7 +74899,7 @@ ${args.objective}`,
         createdAt: Date.now(),
         readBy: /* @__PURE__ */ new Set()
       };
-      pushMessage(msg);
+      await pushMessage(msg);
       return textResult2({ ok: true, message: serialize3(msg) });
     }
     case "mail_inbox": {
@@ -74402,7 +74918,7 @@ ${args.objective}`,
       if (!msg) return textResult2({ error: `message not found: ${args.id}` });
       msg.readBy.add(args.agentId);
       touchAgent(args.agentId);
-      savePersisted();
+      await savePersisted();
       return textResult2({ message: serialize3(msg) });
     }
     case "mail_reply": {
@@ -74422,7 +74938,7 @@ ${args.objective}`,
         createdAt: Date.now(),
         readBy: /* @__PURE__ */ new Set()
       };
-      pushMessage(msg);
+      await pushMessage(msg);
       return textResult2({ ok: true, message: serialize3(msg) });
     }
     case "mail_board": {
@@ -74437,7 +74953,8 @@ ${args.objective}`,
         rooms: [...rooms.entries()].map(([name2, count]) => ({ name: name2, count })),
         urgent,
         recent,
-        note: persistPath() ? `file-backed at ${persistPath()}` : process.env.VERCEL ? "ephemeral on Vercel warm instance" : "in-memory process mailbox"
+        note: describePersistBackend().note,
+        persistBackend: describePersistBackend().backend
       });
     }
     case "mail_stats": {
@@ -74447,21 +74964,26 @@ ${args.objective}`,
         totalMessages: messages.length,
         byPriority,
         agents: agents.size,
-        platform: process.env.VERCEL ? "vercel-ephemeral" : "long-running"
+        platform: platformLabel(),
+        persistBackend: describePersistBackend().backend,
+        redisConfigured: redisEnvPresent()
       });
     }
     default:
       throw new Error(`Unknown mail tool: ${name}`);
   }
 }
-var messages, agents, MAX_MESSAGES, hydrated, MCP_MAIL_TOOLS, MAIL_TOOL_NAMES, PRIORITY_RANK;
+var messages, agents, MAX_MESSAGES, MAIL_KEY, hydrated, hydratePromise, MCP_MAIL_TOOLS, MAIL_TOOL_NAMES, PRIORITY_RANK;
 var init_mailbox = __esm({
   "server/mailbox/index.ts"() {
     init_config();
+    init_persist_store();
     messages = [];
     agents = /* @__PURE__ */ new Map();
     MAX_MESSAGES = 500;
+    MAIL_KEY = namespacedKey("mail", "state");
     hydrated = false;
+    hydratePromise = null;
     MCP_MAIL_TOOLS = [
       {
         name: "mail_whoami",
@@ -74823,6 +75345,7 @@ async function executeMetaTool(name, args) {
   switch (name) {
     case "meta_status": {
       const cfg = getConfig();
+      const persist = describePersistBackend();
       return ok2({
         version: cfg.version,
         profile: cfg.profile,
@@ -74838,7 +75361,21 @@ async function executeMetaTool(name, args) {
         proxyConfigured: Boolean(cfg.proxyUrl),
         excludeTools: cfg.excludeTools,
         mailPersistPath: cfg.mailPersistPath || null,
-        geminiKeyPresent: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY)
+        persistBackend: persist.backend,
+        redisConfigured: redisEnvPresent(),
+        geminiKeyPresent: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+        tavilyKeyPresent: Boolean(process.env.TAVILY_API_KEY),
+        jinaKeyPresent: Boolean(process.env.JINA_API_KEY),
+        searchProvider: process.env.SEARCH_PROVIDER || "auto",
+        playwrightEngine: process.env.PLAYWRIGHT_ENGINE || process.env.OBMC_BROWSER_ENGINE || "playwright",
+        videoEnabled: process.env.OBMC_VIDEO === "1" || process.env.PW_VIDEO === "1",
+        maxDurationHint: process.env.VERCEL ? 300 : null,
+        keysHelp: {
+          GEMINI_API_KEY: "https://aistudio.google.com/apikey",
+          TAVILY_API_KEY: "https://tavily.com (free, no card)",
+          JINA_API_KEY: "https://jina.ai/?sui=apikey",
+          UPSTASH_REDIS_REST_URL_TOKEN: "https://console.upstash.com"
+        }
       });
     }
     case "meta_list_profiles":
@@ -74899,6 +75436,7 @@ var init_meta = __esm({
   "server/meta/index.ts"() {
     init_config();
     init_cache();
+    init_persist_store();
     MCP_META_TOOLS = [
       {
         name: "meta_status",
@@ -97614,7 +98152,7 @@ data: ${messageUrl}
 `);
     const keepAlive = setInterval(() => {
       res.write(": keep-alive\n\n");
-    }, 35e3);
+    }, 15e3);
     browserState.logMcp("inbound", "sse_connect", { sessionId, messageUrl }, "success");
     req.on("close", () => {
       clearInterval(keepAlive);
@@ -116990,7 +117528,7 @@ app.post("/api/extract/:tool", async (req, res) => {
 app.get("/api/extract/health", (_req, res) => {
   res.json({
     ok: true,
-    version: "4.0.0",
+    version: "4.1.0",
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],
@@ -117117,7 +117655,7 @@ data: ${JSON.stringify(data2)}
   });
   const pingInterval = setInterval(() => {
     res.write(": keep-alive\n\n");
-  }, 35e3);
+  }, 15e3);
   req.on("close", () => {
     clearInterval(pingInterval);
     unsubscribe();

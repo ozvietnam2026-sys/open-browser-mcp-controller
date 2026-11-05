@@ -115,7 +115,7 @@ app.post('/api/extract/:tool', async (req: Request, res: Response) => {
 app.get('/api/extract/health', (_req: Request, res: Response) => {
   res.json({
     ok: true,
-    version: '4.0.0',
+    version: '4.1.0',
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],
@@ -252,10 +252,10 @@ app.get('/api/browser/events', (req: Request, res: Response) => {
     res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   });
 
-  // Keep-alive heartbeat every 35s prevents client timeout without rate spam
+  // Keep-alive heartbeat every 15s (Vercel proxy idle cut mitigation)
   const pingInterval = setInterval(() => {
     res.write(': keep-alive\n\n');
-  }, 35000);
+  }, 15000);
 
   req.on('close', () => {
     clearInterval(pingInterval);

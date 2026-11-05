@@ -8,9 +8,13 @@
  */
 import { McpToolDefinition } from '../../shared/browser-types.js';
 import { randomUUID } from 'crypto';
-import fs from 'fs';
-import path from 'path';
 import { getConfig } from '../config.js';
+import {
+  getPersistStore,
+  describePersistBackend,
+  namespacedKey,
+  redisEnvPresent,
+} from '../infra/persist-store.js';
 
 export type MailPriority = 'low' | 'normal' | 'high' | 'urgent';
 
@@ -53,13 +57,24 @@ function persistPath(): string | undefined {
   }
 }
 
-function loadPersisted() {
-  const file = persistPath();
-  if (!file) return;
+const MAIL_KEY = namespacedKey('mail', 'state');
+
+function store() {
+  return getPersistStore({ filePath: persistPath() || './data/mailbox-kv.json' });
+}
+
+async function loadPersisted() {
   try {
-    const resolved = path.resolve(file);
-    if (!fs.existsSync(resolved)) return;
-    const raw = JSON.parse(fs.readFileSync(resolved, 'utf8'));
+    const raw = await store().getJson<{
+      messages?: any[];
+      agents?: AgentPresence[];
+    }>(MAIL_KEY);
+    // File-store legacy: also try reading classic MAIL_PERSIST_PATH shape via getJson of whole file
+    // For file backend we store under key; Memory/Redis same.
+    if (!raw) {
+      // Legacy file format (direct JSON file without key wrapper) handled by FileStore only for keyed data.
+      return;
+    }
     messages.length = 0;
     for (const m of raw.messages || []) {
       messages.push({
@@ -76,34 +91,36 @@ function loadPersisted() {
   }
 }
 
-function savePersisted() {
-  const file = persistPath();
-  if (!file) return;
+async function savePersisted() {
   try {
-    const resolved = path.resolve(file);
-    fs.mkdirSync(path.dirname(resolved), { recursive: true });
-    fs.writeFileSync(
-      resolved,
-      JSON.stringify(
-        {
-          messages: messages.map((m) => ({ ...m, readBy: [...m.readBy] })),
-          agents: [...agents.values()],
-          savedAt: Date.now(),
-        },
-        null,
-        2
-      )
-    );
+    await store().setJson(MAIL_KEY, {
+      messages: messages.map((m) => ({ ...m, readBy: [...m.readBy] })),
+      agents: [...agents.values()],
+      savedAt: Date.now(),
+    });
   } catch {
-    /* Vercel read-only etc. */
+    /* best-effort */
   }
 }
 
 let hydrated = false;
-function ensureHydrated() {
+let hydratePromise: Promise<void> | null = null;
+async function ensureHydrated() {
   if (hydrated) return;
-  hydrated = true;
-  loadPersisted();
+  if (!hydratePromise) {
+    hydratePromise = loadPersisted().then(() => {
+      hydrated = true;
+    });
+  }
+  await hydratePromise;
+}
+
+function platformLabel() {
+  const desc = describePersistBackend();
+  if (desc.backend === 'upstash-redis') return 'vercel-redis';
+  if (process.env.VERCEL) return 'vercel-ephemeral';
+  if (persistPath()) return 'docker-file';
+  return 'long-running-memory';
 }
 
 function textResult(data: unknown) {
@@ -137,11 +154,11 @@ function touchAgent(id: string) {
   });
 }
 
-function pushMessage(msg: MailMessage) {
-  ensureHydrated();
+async function pushMessage(msg: MailMessage) {
+  await ensureHydrated();
   messages.unshift(msg);
   if (messages.length > MAX_MESSAGES) messages.length = MAX_MESSAGES;
-  savePersisted();
+  await savePersisted();
 }
 
 export const MCP_MAIL_TOOLS: McpToolDefinition[] = [
@@ -255,17 +272,18 @@ const PRIORITY_RANK: Record<MailPriority, number> = {
 };
 
 export async function executeMailTool(name: string, args: Record<string, any>) {
-  ensureHydrated();
+  await ensureHydrated();
   switch (name) {
     case 'mail_whoami': {
       const id = args.agentId || process.env.MAIL_AGENT_ID || `agent-${process.pid}`;
       touchAgent(id);
+      const desc = describePersistBackend();
       return textResult({
         agentId: id,
-        platform: process.env.VERCEL ? 'vercel-ephemeral' : 'long-running',
-        note: persistPath()
-          ? `Persisting to ${persistPath()} (file). On Vercel without writable FS, state is warm-instance only.`
-          : 'On Vercel, mailbox state is per warm instance only. Set MAIL_PERSIST_PATH for Docker file persistence.',
+        platform: platformLabel(),
+        persistBackend: desc.backend,
+        redisConfigured: redisEnvPresent(),
+        note: desc.note,
         persistPath: persistPath() || null,
       });
     }
@@ -275,7 +293,7 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
         status: args.status || 'idle',
         lastSeen: Date.now(),
       });
-      savePersisted();
+      await savePersisted();
       return textResult({ ok: true, agent: agents.get(args.agentId) });
     }
     case 'mail_post': {
@@ -292,7 +310,7 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
         createdAt: Date.now(),
         readBy: new Set(),
       };
-      pushMessage(msg);
+      await pushMessage(msg);
       return textResult({ ok: true, message: serialize(msg) });
     }
     case 'mail_handoff': {
@@ -314,7 +332,7 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
         createdAt: Date.now(),
         readBy: new Set(),
       };
-      pushMessage(msg);
+      await pushMessage(msg);
       return textResult({ ok: true, message: serialize(msg) });
     }
     case 'mail_inbox': {
@@ -339,7 +357,7 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
       if (!msg) return textResult({ error: `message not found: ${args.id}` });
       msg.readBy.add(args.agentId);
       touchAgent(args.agentId);
-      savePersisted();
+      await savePersisted();
       return textResult({ message: serialize(msg) });
     }
     case 'mail_reply': {
@@ -359,7 +377,7 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
         createdAt: Date.now(),
         readBy: new Set(),
       };
-      pushMessage(msg);
+      await pushMessage(msg);
       return textResult({ ok: true, message: serialize(msg) });
     }
     case 'mail_board': {
@@ -374,11 +392,8 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
         rooms: [...rooms.entries()].map(([name, count]) => ({ name, count })),
         urgent,
         recent,
-        note: persistPath()
-          ? `file-backed at ${persistPath()}`
-          : process.env.VERCEL
-            ? 'ephemeral on Vercel warm instance'
-            : 'in-memory process mailbox',
+        note: describePersistBackend().note,
+        persistBackend: describePersistBackend().backend,
       });
     }
     case 'mail_stats': {
@@ -388,7 +403,9 @@ export async function executeMailTool(name: string, args: Record<string, any>) {
         totalMessages: messages.length,
         byPriority,
         agents: agents.size,
-        platform: process.env.VERCEL ? 'vercel-ephemeral' : 'long-running',
+        platform: platformLabel(),
+        persistBackend: describePersistBackend().backend,
+        redisConfigured: redisEnvPresent(),
       });
     }
     default:

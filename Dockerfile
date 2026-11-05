@@ -15,6 +15,8 @@ RUN npm run build
 
 # Ensure Chromium deps present (base image already has browsers)
 RUN npx playwright install chromium || true
+# Optional stealth engine (uncomment + set PLAYWRIGHT_ENGINE=patchright):
+# RUN npm install patchright && npx patchright install chromium || true
 
 EXPOSE 3000
 CMD ["npm", "run", "start"]

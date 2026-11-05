@@ -20,6 +20,10 @@ import {
   collectPerformanceMetrics,
   startPerformanceTrace,
   stopPerformanceTrace,
+  startTrace,
+  stopTrace,
+  videoStatus,
+  getBrowserEngine,
   evaluateScript,
   listTabs,
   openTab,
@@ -277,8 +281,26 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
     },
   },
   {
+    name: 'pw_trace_start',
+    description:
+      'Start Playwright context tracing (screenshots+snapshots). Docker/local only. Pair with pw_trace_stop for a ZIP artifact.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'pw_trace_stop',
+    description:
+      'Stop tracing and write ZIP under OBMC_OUTPUT_DIR (open with npx playwright show-trace). Docker/local only.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
+    name: 'pw_video_status',
+    description:
+      'Show whether Playwright recordVideo is enabled (set OBMC_VIDEO=1 on Docker). Videos finalize when page/context closes.',
+    inputSchema: { type: 'object', properties: {} },
+  },
+  {
     name: 'pw_status',
-    description: 'Show Playwright connection mode (launch|cdp|persistent) and current page URL.',
+    description: 'Show Playwright connection mode (launch|cdp|persistent), engine (playwright|patchright), and current page URL.',
     inputSchema: { type: 'object', properties: {} },
   },
 
@@ -722,6 +744,10 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
         return textResult(
           JSON.stringify(
             {
+              engine: getBrowserEngine(),
+              stealthish: process.env.OBMC_STEALTHISH === '1',
+              video: process.env.OBMC_VIDEO === '1' || process.env.PW_VIDEO === '1',
+
               mode: getConnectionMode(),
               available: playwrightAvailable(),
               url,
@@ -830,6 +856,15 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
         return textResult(JSON.stringify(await mouseMoveXY(Number(args.x), Number(args.y)), null, 2));
       case 'pw_highlight':
         return textResult(JSON.stringify(await highlightRef(args.ref), null, 2));
+      case 'pw_trace_start': {
+        return textResult(JSON.stringify(await startTrace(), null, 2));
+      }
+      case 'pw_trace_stop': {
+        return textResult(JSON.stringify(await stopTrace(), null, 2));
+      }
+      case 'pw_video_status': {
+        return textResult(JSON.stringify(await videoStatus(), null, 2));
+      }
       case 'pw_close': {
         await closePlaywright();
         return textResult('Playwright browser closed / CDP detached.');

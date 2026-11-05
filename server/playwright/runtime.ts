@@ -76,19 +76,70 @@ let consoleHooked = false;
 
 let performanceTracing = false;
 
+let engineName: 'playwright' | 'patchright' = 'playwright';
+
 async function loadPlaywright(): Promise<PW> {
   if (!playwrightAvailable()) {
     throw new Error(playwrightUnavailableMessage('playwright'));
   }
   if (pwModule) return pwModule;
+  const prefer = (process.env.PLAYWRIGHT_ENGINE || process.env.OBMC_BROWSER_ENGINE || 'playwright').toLowerCase();
+  if (prefer === 'patchright') {
+    try {
+      // Optional dependency — install with: npm i patchright && npx patchright install chromium
+      const mod = await (Function('return import("patchright")')() as Promise<unknown>);
+      pwModule = mod as PW;
+      engineName = 'patchright';
+      return pwModule;
+    } catch (err: any) {
+      console.warn(`[obmc] patchright not installed (${err?.message || err}); falling back to playwright`);
+    }
+  }
   try {
     pwModule = await import('playwright');
+    engineName = 'playwright';
     return pwModule;
   } catch (err: any) {
     throw new Error(
       `Playwright is not installed. ${playwrightUnavailableMessage('playwright')} (${err?.message || err})`
     );
   }
+}
+
+export function getBrowserEngine() {
+  return engineName;
+}
+
+function stealthLaunchArgs(): string[] {
+  const base = ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'];
+  if (process.env.OBMC_STEALTHISH !== '1') return base;
+  return [
+    ...base,
+    '--disable-blink-features=AutomationControlled',
+    '--disable-features=IsolateOrigins,site-per-process',
+    '--lang=en-US,en',
+  ];
+}
+
+async function stealthInitScripts(ctx: import('playwright').BrowserContext) {
+  if (process.env.OBMC_STEALTHISH !== '1') return;
+  await ctx.addInitScript(() => {
+    try {
+      Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+      const w = window as unknown as { chrome?: { runtime: object } };
+      w.chrome = w.chrome || { runtime: {} };
+      Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+      Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    } catch {
+      /* */
+    }
+  });
+}
+
+function videoDir(): string | undefined {
+  if (process.env.OBMC_VIDEO !== '1' && process.env.PW_VIDEO !== '1') return undefined;
+  const dir = process.env.OBMC_OUTPUT_DIR || './data/output';
+  return `${dir.replace(/\/$/, '')}/video`;
 }
 
 function hookNetwork(p: import('playwright').Page) {
@@ -208,13 +259,16 @@ export async function getPage() {
       context = await pw.chromium.launchPersistentContext(userDataDir, {
         headless: process.env.PLAYWRIGHT_HEADED !== '1',
         args: [
-          '--no-sandbox',
-          '--disable-setuid-sandbox',
+          ...stealthLaunchArgs(),
           '--password-store=basic',
           '--use-mock-keychain',
         ],
         viewport: { width: 1280, height: 720 },
+        recordVideo: videoDir() ? { dir: videoDir()! } : undefined,
+        ignoreHTTPSErrors: process.env.OBMC_IGNORE_HTTPS_ERRORS === '1',
+        proxy: process.env.OBMC_PROXY ? { server: process.env.OBMC_PROXY } : undefined,
       });
+      await stealthInitScripts(context);
       connectionMode = 'persistent';
       browser = context.browser();
       const pages = context.pages();
@@ -224,18 +278,23 @@ export async function getPage() {
     } else {
       browser = await pw.chromium.launch({
         headless: process.env.PLAYWRIGHT_HEADED !== '1',
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: stealthLaunchArgs(),
         executablePath: process.env.CHROME_EXECUTABLE_PATH || undefined,
       });
       connectionMode = 'launch';
     }
   }
   if (!context) {
+    const { getConfig } = await import('../config.js');
+    const cfg = getConfig();
     context = await browser!.newContext({
       viewport: { width: 1280, height: 720 },
-      userAgent:
-        'OpenBrowserMCP-Playwright/4.0 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)',
+      userAgent: cfg.userAgent || 'OpenBrowserMCP-Playwright/4.1 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller)',
+      ignoreHTTPSErrors: cfg.ignoreHttpsErrors,
+      proxy: cfg.proxyUrl ? { server: cfg.proxyUrl, bypass: cfg.proxyBypass.join(',') || undefined } : undefined,
+      recordVideo: videoDir() ? { dir: videoDir()! } : undefined,
     });
+    await stealthInitScripts(context);
   }
   if (!page || page.isClosed()) {
     page = await context.newPage();
@@ -274,7 +333,10 @@ export async function closePlaywright(opts: { keepModule?: boolean } = {}) {
   consoleHooked = false;
   performanceTracing = false;
   connectionMode = 'launch';
-  if (!opts.keepModule) pwModule = null;
+  if (!opts.keepModule) {
+    pwModule = null;
+    engineName = 'playwright';
+  }
 }
 
 function escapeCss(s: string) {
@@ -288,7 +350,39 @@ export async function buildA11ySnapshot(
   const p = await getPage();
   const maxNodes = options.maxNodes ?? 200;
   const maxDepth = options.maxDepth ?? 12;
-  const snapshot = await p.accessibility.snapshot({ interestingOnly: options.interactiveOnly !== false });
+  const pageAny = p as any;
+  let snapshot: any = null;
+  if (pageAny.accessibility?.snapshot) {
+    snapshot = await pageAny.accessibility.snapshot({ interestingOnly: options.interactiveOnly !== false });
+  } else if (typeof pageAny.locator === 'function') {
+    try {
+      // Playwright 1.49+ removed accessibility; prefer ariaSnapshot when present
+      const aria = pageAny.locator('body').ariaSnapshot
+        ? await pageAny.locator('body').ariaSnapshot()
+        : null;
+      if (typeof aria === 'string') {
+        // Convert flat aria text into a minimal tree for ref walker
+        snapshot = { role: 'WebArea', name: await p.title(), children: [{ role: 'generic', name: aria.slice(0, 4000) }] };
+      }
+    } catch {
+      snapshot = null;
+    }
+  }
+  if (!snapshot) {
+    // Fallback: DOM-ish interactive inventory
+    snapshot = {
+      role: 'WebArea',
+      name: await p.title(),
+      children: await p.$$eval(
+        'a,button,input,textarea,select,[role],[tabindex]',
+        (els: Element[]) =>
+          els.slice(0, 120).map((el) => ({
+            role: el.getAttribute('role') || el.tagName.toLowerCase(),
+            name: (el.getAttribute('aria-label') || (el as HTMLElement).innerText || '').trim().slice(0, 80),
+          }))
+      ),
+    };
+  }
   refMap.clear();
   const lines: string[] = [];
   let counter = 0;
@@ -429,7 +523,7 @@ export async function applyEmulation(options: {
   if (options.userAgent) await ctx.setExtraHTTPHeaders({ ...(options.extraHTTPHeaders || {}) });
   // Playwright setExtraHTTPHeaders replaces; merge carefully
   if (options.extraHTTPHeaders) await ctx.setExtraHTTPHeaders(options.extraHTTPHeaders);
-  if (options.colorScheme) await ctx.emulateMedia({ colorScheme: options.colorScheme });
+  if (options.colorScheme) await (ctx as any).emulateMedia({ colorScheme: options.colorScheme });
   if (options.geolocation) {
     await ctx.grantPermissions(['geolocation']);
     await ctx.setGeolocation(options.geolocation);
@@ -511,21 +605,58 @@ export async function startPerformanceTrace() {
   }
 }
 
-export async function stopPerformanceTrace(): Promise<{ ok: boolean; message: string; metrics: any }> {
+export async function stopPerformanceTrace(): Promise<{
+  ok: boolean;
+  message: string;
+  metrics: any;
+  tracePath?: string;
+}> {
   const metrics = await collectPerformanceMetrics();
+  let tracePath: string | undefined;
   if (performanceTracing) {
     try {
-      // Do not write large zip to disk on serverless-like hosts; just stop.
-      await page?.context().tracing.stop();
+      const fs = await import('fs');
+      const path = await import('path');
+      const outDir = process.env.OBMC_OUTPUT_DIR || './data/output';
+      fs.mkdirSync(path.resolve(outDir), { recursive: true });
+      tracePath = path.resolve(outDir, `trace-${Date.now()}.zip`);
+      await page?.context().tracing.stop({ path: tracePath });
     } catch {
-      /* */
+      try {
+        await page?.context().tracing.stop();
+      } catch {
+        /* */
+      }
     }
   }
   performanceTracing = false;
   return {
     ok: true,
-    message: 'Performance trace stopped. Lab metrics below (chrome-devtools-mcp style insights lite).',
+    message: tracePath
+      ? `Playwright trace saved to ${tracePath}. Open with: npx playwright show-trace <path>`
+      : 'Performance trace stopped (no zip written — set OBMC_OUTPUT_DIR on Docker/local). Lab metrics below.',
     metrics,
+    tracePath,
+  };
+}
+
+/** Dedicated trace start (alias of startPerformanceTrace with clearer name). */
+export async function startTrace() {
+  return startPerformanceTrace();
+}
+
+export async function stopTrace() {
+  return stopPerformanceTrace();
+}
+
+export async function videoStatus() {
+  const dir = videoDir();
+  return {
+    enabled: Boolean(dir),
+    dir: dir || null,
+    note: dir
+      ? 'Context recordVideo is on (OBMC_VIDEO=1). Close page/context to finalize .webm under dir.'
+      : 'Set OBMC_VIDEO=1 (Docker/local) to record Playwright videos under OBMC_OUTPUT_DIR/video.',
   };
 }
 
@@ -695,13 +826,15 @@ export async function loadStorageState(filePath: string) {
   await closePlaywright({ keepModule: true });
   browser = await pw.chromium.launch({
     headless: process.env.PLAYWRIGHT_HEADED !== '1',
-    args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    args: stealthLaunchArgs(),
   });
   connectionMode = 'launch';
   context = await browser.newContext({
     storageState: state,
     viewport: { width: 1280, height: 720 },
+    recordVideo: videoDir() ? { dir: videoDir()! } : undefined,
   });
+  await stealthInitScripts(context);
   page = await context.newPage();
   networkHooked = false;
   consoleHooked = false;

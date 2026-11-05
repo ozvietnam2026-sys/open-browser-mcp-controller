@@ -41,10 +41,10 @@ export class McpServerHandler {
     const messageUrl = `/mcp/messages?sessionId=${sessionId}`;
     res.write(`event: endpoint\ndata: ${messageUrl}\n\n`);
 
-    // Keep-alive heartbeat every 35s (>= 30s)
+    // Keep-alive heartbeat every 15s (Vercel proxy / Fluid idle cut mitigation)
     const keepAlive = setInterval(() => {
       res.write(': keep-alive\n\n');
-    }, 35000);
+    }, 15000);
 
     browserState.logMcp('inbound', 'sse_connect', { sessionId, messageUrl }, 'success');
 

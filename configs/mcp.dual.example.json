@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "open-browser-mcp": {
+      "url": "https://open-browser-mcp-controller-ozvietnam.vercel.app/mcp",
+      "transport": "http"
+    },
+    "open-browser-mcp-local": {
+      "command": "npx",
+      "args": ["tsx", "scripts/mcp-stdio.ts"],
+      "cwd": "/absolute/path/to/open-browser-mcp-controller",
+      "env": {
+        "OBMC_PROFILE": "full",
+        "ENABLE_PLAYWRIGHT": "1"
+      }
+    },
+    "agent-desktop": {
+      "command": "agent-desktop",
+      "args": ["mcp"],
+      "env": {}
+    }
+  }
+}

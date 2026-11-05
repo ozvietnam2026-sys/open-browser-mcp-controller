@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ozvietnam.vercel.app  
-Version: **4.0.0** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Version: **4.1.0** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
@@ -19,6 +19,14 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1 highlights
+- **Vercel** `maxDuration: 300` + SSE heartbeats every ~15s (reconnect-friendly)
+- **Search cascade**: Tavily → Jina → Wikipedia OpenSearch → DuckDuckGo (keys auto-enable)
+- **PersistStore**: Memory | File | Upstash Redis REST — mailbox + change-store durable when Redis env set
+- **Playwright Docker**: optional Patchright (`PLAYWRIGHT_ENGINE=patchright`), stealthish init, `pw_trace_*`, `OBMC_VIDEO=1`
+- **One-click Render**: [`render.yaml`](render.yaml) Blueprint
+- **agent-desktop sidecar**: [`docs/agent-desktop-sidecar.md`](docs/agent-desktop-sidecar.md) + [`configs/mcp.dual.example.json`](configs/mcp.dual.example.json)
 
 ### Inspiration (reimplemented ideas)
 | Project | Adopted |

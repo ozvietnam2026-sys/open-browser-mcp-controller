@@ -1,39 +1,55 @@
 /**
  * Change tracking store — Firecrawl changeTracking inspired (git-diff / status).
- * Persists snapshots under data/ so Docker keeps history; Vercel is ephemeral /tmp.
+ * Backends: Upstash Redis (when env set) → file (Docker/local) → /tmp or memory on Vercel.
  */
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { getConfig } from '../config.js';
+import { getPersistStore, namespacedKey, describePersistBackend, redisEnvPresent } from '../infra/persist-store.js';
 
 type Snap = { url: string; tag: string; hash: string; markdown: string; at: number };
-
 type Store = Record<string, Snap>; // key = tag::url
 
-function storePath() {
+const STORE_KEY = namespacedKey('change', 'store');
+
+function fileFallbackPath() {
   const p = getConfig().changeStorePath;
-  // On Vercel use /tmp
-  if (process.env.VERCEL) return path.join('/tmp', 'obmc-change-store.json');
+  if (process.env.VERCEL && !redisEnvPresent()) return path.join('/tmp', 'obmc-change-store.json');
   return path.resolve(p);
 }
 
-function load(): Store {
+async function load(): Promise<Store> {
+  const store = getPersistStore({ filePath: fileFallbackPath() });
+  if (redisEnvPresent() || store.backend !== 'memory') {
+    const raw = await store.getJson<Store>(STORE_KEY);
+    if (raw) return raw;
+  }
+  // Legacy direct file (pre-v4.1)
   try {
-    const raw = fs.readFileSync(storePath(), 'utf8');
+    const raw = fs.readFileSync(fileFallbackPath(), 'utf8');
     return JSON.parse(raw);
   } catch {
     return {};
   }
 }
 
-function save(store: Store) {
+async function save(data: Store) {
+  const store = getPersistStore({ filePath: fileFallbackPath() });
   try {
-    const p = storePath();
-    fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, JSON.stringify(store));
+    await store.setJson(STORE_KEY, data);
   } catch {
-    /* best-effort */
+    /* */
+  }
+  // Also mirror to legacy file when not using Redis on long-running hosts
+  if (!redisEnvPresent() && !process.env.VERCEL) {
+    try {
+      const p = fileFallbackPath();
+      fs.mkdirSync(path.dirname(p), { recursive: true });
+      fs.writeFileSync(p, JSON.stringify(data));
+    } catch {
+      /* */
+    }
   }
 }
 
@@ -64,32 +80,35 @@ export function lineDiff(prev: string, next: string, maxLines = 80): string {
   return out.join('\n');
 }
 
-export function trackChange(opts: {
+export async function trackChange(opts: {
   url: string;
   markdown: string;
   tag?: string;
-}): {
+}): Promise<{
   status: 'new' | 'same' | 'changed';
   previousAt?: number;
   hash: string;
   previousHash?: string;
   diff?: string;
-} {
+  persistBackend?: string;
+}> {
   const tag = opts.tag || 'default';
-  const store = load();
+  const store = await load();
   const k = key(opts.url, tag);
   const hash = hashText(opts.markdown);
   const prev = store[k];
   store[k] = { url: opts.url, tag, hash, markdown: opts.markdown.slice(0, 200_000), at: Date.now() };
-  save(store);
+  await save(store);
+  const backend = describePersistBackend().backend;
 
-  if (!prev) return { status: 'new', hash };
-  if (prev.hash === hash) return { status: 'same', hash, previousHash: prev.hash, previousAt: prev.at };
+  if (!prev) return { status: 'new', hash, persistBackend: backend };
+  if (prev.hash === hash) return { status: 'same', hash, previousHash: prev.hash, previousAt: prev.at, persistBackend: backend };
   return {
     status: 'changed',
     hash,
     previousHash: prev.hash,
     previousAt: prev.at,
     diff: lineDiff(prev.markdown, opts.markdown),
+    persistBackend: backend,
   };
 }

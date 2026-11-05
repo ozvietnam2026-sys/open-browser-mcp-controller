@@ -1,4 +1,4 @@
-# Feature Matrix — Open Browser MCP Controller v4.0.0
+# Feature Matrix — Open Browser MCP Controller v4.1.0
 
 Inventory of advanced / lesser-known features researched from public sources and adoption status.
 Ideas are **reimplemented** (not copied) under compatible licenses; paid SaaS APIs are not required.
@@ -127,3 +127,21 @@ Legend: **adopted** = in repo · **planned** = backlog · **N/A** = not applicab
 - https://github.com/jeffrey-nz/browser-ai-bridge
 - https://github.com/jrb00013/mailnotmilk
 - Firecrawl / Jina / Stagehand public docs
+
+
+## v4.1 additions (plan backlog)
+
+| Feature | Source | Status |
+|---|---|---|
+| Vercel maxDuration 300 | Vercel Fluid | **Done** (`vercel.json`) |
+| SSE heartbeat ~15s | MCP SSE best practice | **Done** |
+| PersistStore Memory/File/Upstash | mailnotmilk + Upstash | **Done** (auto when env set) |
+| Search Tavily/Jina/Wikipedia/DDG | Firecrawl/Jina/Tavily market | **Done** (cascade) |
+| Jina s.jina.ai keyless | Jina | **Tried — blocked 401**; keyed path ready |
+| Patchright engine option | stealth community | **Done** (`PLAYWRIGHT_ENGINE`) |
+| Stealthish UA / webdriver patch | agent-browser | **Done** (`OBMC_STEALTHISH`) |
+| Playwright trace ZIP | playwright-mcp | **Done** (`pw_trace_start/stop`) |
+| Playwright recordVideo | playwright | **Done** (`OBMC_VIDEO` + `pw_video_status`) |
+| render.yaml Blueprint | Render | **Done** |
+| agent-desktop dual MCP docs | vercel-labs/agent-desktop | **Done** (docs/config; OS a11y N/A on cloud) |
+| Lighthouse / full video pipeline | chrome-devtools | **Deferred** |

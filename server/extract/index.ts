@@ -363,7 +363,7 @@ export async function executeExtractTool(name: string, args: Record<string, any>
       const res = await fetchUrl(args.url, { ignoreCache: true });
       const $ = loadHtml(res.bodyText);
       const readable = extractReadable($, res.finalUrl);
-      const change = trackChange({
+      const change = await trackChange({
         url: res.finalUrl,
         markdown: readable.contentMarkdown || '',
         tag: args.tag,

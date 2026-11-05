@@ -13,6 +13,7 @@ import {
   filterToolsByCaps,
 } from '../config.js';
 import { cacheStats, cacheClear } from '../infra/cache.js';
+import { describePersistBackend, redisEnvPresent } from '../infra/persist-store.js';
 
 export const MCP_META_TOOLS: McpToolDefinition[] = [
   {
@@ -88,6 +89,7 @@ export async function executeMetaTool(name: string, args: Record<string, any>) {
   switch (name) {
     case 'meta_status': {
       const cfg = getConfig();
+      const persist = describePersistBackend();
       return ok({
         version: cfg.version,
         profile: cfg.profile,
@@ -103,7 +105,21 @@ export async function executeMetaTool(name: string, args: Record<string, any>) {
         proxyConfigured: Boolean(cfg.proxyUrl),
         excludeTools: cfg.excludeTools,
         mailPersistPath: cfg.mailPersistPath || null,
+        persistBackend: persist.backend,
+        redisConfigured: redisEnvPresent(),
         geminiKeyPresent: Boolean(process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY),
+        tavilyKeyPresent: Boolean(process.env.TAVILY_API_KEY),
+        jinaKeyPresent: Boolean(process.env.JINA_API_KEY),
+        searchProvider: process.env.SEARCH_PROVIDER || 'auto',
+        playwrightEngine: process.env.PLAYWRIGHT_ENGINE || process.env.OBMC_BROWSER_ENGINE || 'playwright',
+        videoEnabled: process.env.OBMC_VIDEO === '1' || process.env.PW_VIDEO === '1',
+        maxDurationHint: process.env.VERCEL ? 300 : null,
+        keysHelp: {
+          GEMINI_API_KEY: 'https://aistudio.google.com/apikey',
+          TAVILY_API_KEY: 'https://tavily.com (free, no card)',
+          JINA_API_KEY: 'https://jina.ai/?sui=apikey',
+          UPSTASH_REDIS_REST_URL_TOKEN: 'https://console.upstash.com',
+        },
       });
     }
     case 'meta_list_profiles':

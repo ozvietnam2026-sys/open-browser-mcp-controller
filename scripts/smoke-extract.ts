@@ -33,7 +33,7 @@ async function run(tool: string, fn: () => Promise<void>) {
 }
 
 async function main() {
-  console.log('=== Open Browser MCP — smoke tests (v4.0) ===\n');
+  console.log('=== Open Browser MCP — smoke tests (v4.1) ===\n');
 
   await run('registry_counts', async () => {
     const names = ALL_MCP_TOOLS.map((t) => t.name);
@@ -53,6 +53,9 @@ async function main() {
       'pw_upload',
       'pw_download',
       'pw_mouse_click_xy',
+      'pw_trace_start',
+      'pw_trace_stop',
+      'pw_video_status',
       'mail_inbox',
       'ai_list_providers',
       'meta_status',
@@ -68,8 +71,25 @@ async function main() {
 
   await run('meta_status', async () => {
     const d = parse(await executeMetaTool('meta_status', {}));
-    if (d.version !== '4.0.0') throw new Error(`bad version ${d.version}`);
+    if (d.version !== '4.1.0') throw new Error(`bad version ${d.version}`);
     if (!Array.isArray(d.caps) || !d.caps.length) throw new Error('no caps');
+    if (!('redisConfigured' in d) || !('persistBackend' in d)) throw new Error('missing persist flags');
+    if (!('tavilyKeyPresent' in d) || !('jinaKeyPresent' in d)) throw new Error('missing search key flags');
+  });
+
+  await run('persist_backend_memory', async () => {
+    const { describePersistBackend, getPersistStore, resetPersistStoreForTests } = await import(
+      '../server/infra/persist-store.js'
+    );
+    resetPersistStoreForTests();
+    const info = describePersistBackend();
+    if (!info.backend) throw new Error('no backend');
+    const store = getPersistStore({ filePath: './data/smoke-persist.json', namespace: 'smoke' });
+    await store.setJson('k', { v: 1 });
+    const got = await store.getJson<{ v: number }>('k');
+    if (!got || got.v !== 1) throw new Error('persist roundtrip failed');
+    await store.del('k');
+    console.log(`   backend=${store.backend} described=${info.backend}`);
   });
 
   await run('extract_http_fetch', async () => {
@@ -120,10 +140,14 @@ async function main() {
   });
 
   await run('extract_search', async () => {
-    const d = parse(await executeExtractTool('extract_search', { query: 'example domain', limit: 5 }));
-    if (!Array.isArray(d.results) && !Array.isArray(d.items)) {
-      throw new Error(`bad search shape: ${JSON.stringify(d).slice(0, 200)}`);
+    const d = parse(await executeExtractTool('extract_search', { query: 'Web scraping', limit: 5 }));
+    const list = d.results || d.items;
+    if (!Array.isArray(list)) throw new Error(`bad search shape: ${JSON.stringify(d).slice(0, 200)}`);
+    // Keyless cascade should hit Wikipedia OpenSearch at least
+    if (list.length < 1 && !d.note && !d.degraded) {
+      throw new Error(`empty search without degrade note: ${JSON.stringify(d).slice(0, 300)}`);
     }
+    console.log(`   provider=${d.provider} count=${list.length} tried=${(d.tried || []).join(',')}`);
   });
 
   await run('extract_observe', async () => {
