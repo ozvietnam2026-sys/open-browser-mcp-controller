@@ -1,16 +1,26 @@
 /**
  * Optional LLM schema extract (ScrapeGraphAI / Firecrawl extract / Stagehand extract inspired).
  * Uses GEMINI_API_KEY when present; otherwise returns a clear skip.
+ * Model cascade: prefer latest flash, fall back on 404/429/503.
  */
 import { fetchUrl } from './http-fetch.js';
 import { loadHtml, extractReadable, visibleText } from './parse-html.js';
+
+const MODEL_CASCADE = [
+  process.env.GEMINI_MODEL,
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+].filter(Boolean) as string[];
 
 export async function llmExtract(opts: {
   url: string;
   prompt?: string;
   schema?: Record<string, unknown>;
 }) {
-  const key = process.env.GEMINI_API_KEY;
+  const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!key) {
     return {
       ok: false,
@@ -39,22 +49,44 @@ export async function llmExtract(opts: {
     generationConfig: { temperature: 0.1, responseMimeType: 'application/json' },
   };
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key)}`;
-  const r = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  const json = await r.json();
-  if (!r.ok) {
-    return { ok: false, status: r.status, error: json?.error?.message || JSON.stringify(json).slice(0, 500) };
+  const tried: string[] = [];
+  const errors: string[] = [];
+  for (const model of MODEL_CASCADE) {
+    tried.push(model);
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+    try {
+      const r = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = (await r.json()) as any;
+      if (!r.ok) {
+        const msg = json?.error?.message || JSON.stringify(json).slice(0, 300);
+        errors.push(`${model}:${r.status}:${msg}`);
+        // Retry next model on unavailable / rate / not found
+        if ([404, 429, 500, 503].includes(r.status)) continue;
+        return { ok: false, status: r.status, error: msg, tried, model };
+      }
+      const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      let data: unknown = raw;
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        /* keep raw */
+      }
+      return { ok: true, url: res.finalUrl, data, model, tried };
+    } catch (err: any) {
+      errors.push(`${model}:throw:${err?.message || err}`);
+      continue;
+    }
   }
-  const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-  let data: unknown = raw;
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    /* keep raw */
-  }
-  return { ok: true, url: res.finalUrl, data, model: 'gemini-2.0-flash' };
+
+  return {
+    ok: false,
+    status: 503,
+    error: 'All Gemini models failed or were overloaded. Retry later.',
+    tried,
+    errors: errors.slice(0, 8),
+  };
 }

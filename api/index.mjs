@@ -25228,7 +25228,7 @@ function getConfig() {
   const envCaps = parseCaps(process.env.MCP_CAPS || process.env.OBMC_CAPS || process.env.PLAYWRIGHT_MCP_CAPS);
   const caps = runtimeCapsOverride || envCaps || profileCaps;
   return {
-    version: "4.1.0",
+    version: "4.1.1",
     userAgent: process.env.OBMC_USER_AGENT || process.env.AGENT_BROWSER_USER_AGENT || "OpenBrowserMCP/4.1 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller; research bot)",
     proxyUrl: process.env.OBMC_PROXY || process.env.AGENT_BROWSER_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || void 0,
     proxyBypass: parseList(process.env.OBMC_PROXY_BYPASS || process.env.AGENT_BROWSER_PROXY_BYPASS || process.env.NO_PROXY),
@@ -72609,7 +72609,7 @@ var init_change_store = __esm({
 
 // server/extract/llm-extract.ts
 async function llmExtract(opts) {
-  const key2 = process.env.GEMINI_API_KEY;
+  const key2 = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
   if (!key2) {
     return {
       ok: false,
@@ -72638,28 +72638,57 @@ ${text3}` }]
     ],
     generationConfig: { temperature: 0.1, responseMimeType: "application/json" }
   };
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${encodeURIComponent(key2)}`;
-  const r2 = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body)
-  });
-  const json = await r2.json();
-  if (!r2.ok) {
-    return { ok: false, status: r2.status, error: json?.error?.message || JSON.stringify(json).slice(0, 500) };
+  const tried = [];
+  const errors2 = [];
+  for (const model of MODEL_CASCADE) {
+    tried.push(model);
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key2)}`;
+    try {
+      const r2 = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body)
+      });
+      const json = await r2.json();
+      if (!r2.ok) {
+        const msg = json?.error?.message || JSON.stringify(json).slice(0, 300);
+        errors2.push(`${model}:${r2.status}:${msg}`);
+        if ([404, 429, 500, 503].includes(r2.status)) continue;
+        return { ok: false, status: r2.status, error: msg, tried, model };
+      }
+      const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+      let data2 = raw;
+      try {
+        data2 = JSON.parse(raw);
+      } catch {
+      }
+      return { ok: true, url: res.finalUrl, data: data2, model, tried };
+    } catch (err) {
+      errors2.push(`${model}:throw:${err?.message || err}`);
+      continue;
+    }
   }
-  const raw = json?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-  let data2 = raw;
-  try {
-    data2 = JSON.parse(raw);
-  } catch {
-  }
-  return { ok: true, url: res.finalUrl, data: data2, model: "gemini-2.0-flash" };
+  return {
+    ok: false,
+    status: 503,
+    error: "All Gemini models failed or were overloaded. Retry later.",
+    tried,
+    errors: errors2.slice(0, 8)
+  };
 }
+var MODEL_CASCADE;
 var init_llm_extract = __esm({
   "server/extract/llm-extract.ts"() {
     init_http_fetch();
     init_parse_html();
+    MODEL_CASCADE = [
+      process.env.GEMINI_MODEL,
+      "gemini-3.8-flash",
+      "gemini-3.7-flash",
+      "gemini-3.5-flash",
+      "gemini-2.5-flash",
+      "gemini-flash-latest"
+    ].filter(Boolean);
   }
 });
 
@@ -117149,6 +117178,28 @@ var GeminiBrowserAgent = class {
     const job = { abort: false };
     this.activeJobs.set(jobId, job);
     const steps = [];
+    const AGENT_MODEL_CASCADE = [
+      process.env.GEMINI_MODEL,
+      "gemini-3.8-flash",
+      "gemini-3.7-flash",
+      "gemini-3.5-flash",
+      "gemini-2.5-flash",
+      "gemini-flash-latest"
+    ].filter(Boolean);
+    async function generateWithCascade(ai2, args) {
+      let lastErr;
+      for (const model of AGENT_MODEL_CASCADE) {
+        try {
+          return await ai2.models.generateContent({ model, contents: args.contents, config: args.config });
+        } catch (err) {
+          lastErr = err;
+          const msg = String(err?.message || err);
+          if (/404|429|503|high demand|no longer available|not found/i.test(msg)) continue;
+          throw err;
+        }
+      }
+      throw lastErr || new Error("All Gemini agent models failed");
+    }
     const MAX_STEPS = 14;
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -117348,8 +117399,7 @@ H\xE3y ph\xE2n t\xEDch m\u1EE5c ti\xEAu v\xE0 quy\u1EBFt \u0111\u1ECBnh c\xF4ng 
           onStep(abortStep);
           return { success: false, answer: "\u0110\xE3 d\u1EEBng t\xE1c v\u1EE5.", steps };
         }
-        const response = await ai.models.generateContent({
-          model: "gemini-3.8-flash",
+        const response = await generateWithCascade(ai, {
           contents: conversationContents,
           config: {
             systemInstruction,
@@ -117528,7 +117578,7 @@ app.post("/api/extract/:tool", async (req, res) => {
 app.get("/api/extract/health", (_req, res) => {
   res.json({
     ok: true,
-    version: "4.1.0",
+    version: "4.1.1",
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],

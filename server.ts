@@ -115,7 +115,7 @@ app.post('/api/extract/:tool', async (req: Request, res: Response) => {
 app.get('/api/extract/health', (_req: Request, res: Response) => {
   res.json({
     ok: true,
-    version: '4.1.0',
+    version: '4.1.1',
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],

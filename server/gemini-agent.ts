@@ -27,7 +27,31 @@ export class GeminiBrowserAgent {
     this.activeJobs.set(jobId, job);
 
     const steps: AgentStep[] = [];
-    const MAX_STEPS = 14;
+    const AGENT_MODEL_CASCADE = [
+  process.env.GEMINI_MODEL,
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+  'gemini-flash-latest',
+].filter(Boolean) as string[];
+
+async function generateWithCascade(ai: any, args: { contents: any; config: any }) {
+  let lastErr: any;
+  for (const model of AGENT_MODEL_CASCADE) {
+    try {
+      return await ai.models.generateContent({ model, contents: args.contents, config: args.config });
+    } catch (err: any) {
+      lastErr = err;
+      const msg = String(err?.message || err);
+      if (/404|429|503|high demand|no longer available|not found/i.test(msg)) continue;
+      throw err;
+    }
+  }
+  throw lastErr || new Error('All Gemini agent models failed');
+}
+
+const MAX_STEPS = 14;
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
@@ -236,8 +260,7 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
           return { success: false, answer: 'Đã dừng tác vụ.', steps };
         }
 
-        const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+        const response = await generateWithCascade(ai, {
           contents: conversationContents,
           config: {
             systemInstruction,
