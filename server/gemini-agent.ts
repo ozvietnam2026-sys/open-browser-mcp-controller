@@ -334,7 +334,7 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
         steps.push(stepRecord);
         onStep(stepRecord);
 
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, 350));
 
         conversationContents.push({
           role: 'model',

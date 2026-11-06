@@ -275,10 +275,15 @@ export class ProxyEngine {
                 }
               });
 
-              // Initial snapshot after page load
-              window.addEventListener('DOMContentLoaded', sendDomSnapshot);
-              window.addEventListener('load', sendDomSnapshot);
-              setTimeout(sendDomSnapshot, 800);
+              // One delayed snapshot after load — avoid triple storm (DOMContentLoaded+load+timeout)
+              var sent = false;
+              function sendOnce() {
+                if (sent) return;
+                sent = true;
+                sendDomSnapshot();
+              }
+              window.addEventListener('load', function() { setTimeout(sendOnce, 400); });
+              setTimeout(sendOnce, 1200);
             } catch(e) {
               console.error('MCP Bridge Error:', e);
             }

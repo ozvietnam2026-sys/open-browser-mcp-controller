@@ -18,7 +18,14 @@ import {
 } from '../shared/browser-types';
 import { Camera, Download, X } from 'lucide-react';
 import { sseClient } from './services/sseClient';
+import {
+  isFreshDefaultSession,
+  hasUserSession,
+  urlsEquivalent,
+} from '../shared/browser-session';
 
+/** Bundle marker so we can verify the live Vercel deploy picked up this perf fix. */
+export const OBMC_UI_BUILD = 'obmc-ui-perf-20261106';
 
 const BROWSER_SESSION_KEY = 'obmc.browser.session';
 
@@ -59,27 +66,17 @@ function readPersistedSession(): { tabs: BrowserTab[]; activeTabId: string } | n
   }
 }
 
-function isFreshDefaultSession(tabs: BrowserTab[] | undefined): boolean {
-  if (!tabs || tabs.length !== 1) return false;
-  const url = (tabs[0].url || '').toLowerCase();
-  const history = tabs[0].history || [];
-  return (url === 'browser://search' || url === '') && history.length <= 1;
-}
+let lastSyncedKey = '';
+let lastSyncedAt = 0;
 
-function hasUserSession(tabs: BrowserTab[] | undefined): boolean {
-  if (!tabs || tabs.length === 0) return false;
-  return tabs.some((t) => {
-    const url = t.url || '';
-    if (url.startsWith('http://') || url.startsWith('https://')) return true;
-    if (url.startsWith('browser://search?')) return true;
-    if (url.startsWith('browser://') && url !== 'browser://search') return true;
-    if (t.history && t.history.length > 1) return true;
-    return false;
-  });
-}
-
+/** Sync local tab URL to serverless browserState — debounced so SSE reconnects do not stampede. */
 function syncTabUrlToServer(tab: BrowserTab | undefined) {
   if (!tab?.url) return;
+  const key = `${tab.id}|${tab.url}`;
+  const now = Date.now();
+  if (key === lastSyncedKey && now - lastSyncedAt < 15000) return;
+  lastSyncedKey = key;
+  lastSyncedAt = now;
   fetch('/api/mcp/rpc', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -115,6 +112,8 @@ export default function App() {
 
   // Screenshot viewer modal
   const [screenshotModal, setScreenshotModal] = useState<{ url: string; dataUrl: string } | null>(null);
+  // Bump to force iframe remount on Reload (proxy pages otherwise keep stale document)
+  const [reloadNonce, setReloadNonce] = useState(0);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
@@ -155,7 +154,19 @@ export default function App() {
     const unsubNav = sseClient.subscribe('tab_navigated', (data) => {
       if (data?.tab) {
         setTabs((prev) =>
-          prev.map((t) => (t.id === data.tab.id ? { ...t, ...data.tab } : t))
+          prev.map((t) => {
+            if (t.id !== data.tab.id) return t;
+            // Skip no-op merges that only change lastUpdated — cuts React re-renders
+            if (
+              urlsEquivalent(t.url, data.tab.url) &&
+              t.title === data.tab.title &&
+              t.isLoading === data.tab.isLoading &&
+              t.historyIndex === data.tab.historyIndex
+            ) {
+              return t;
+            }
+            return { ...t, ...data.tab };
+          })
         );
       }
     });
@@ -341,11 +352,12 @@ export default function App() {
     setTabs((prev) =>
       prev.map((t) => (t.id === activeTabId ? { ...t, isLoading: true } : t))
     );
+    setReloadNonce((n) => n + 1);
     setTimeout(() => {
       setTabs((prev) =>
         prev.map((t) => (t.id === activeTabId ? { ...t, isLoading: false } : t))
       );
-    }, 400);
+    }, 600);
   };
 
   const handleTitleChange = useCallback((newTitle: string) => {
@@ -442,7 +454,10 @@ export default function App() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans">
+    <div
+      className="flex flex-col h-screen w-screen bg-slate-950 text-slate-100 overflow-hidden font-sans"
+      data-obmc-build={OBMC_UI_BUILD}
+    >
       {/* 1. Browser Chrome Toolbar */}
       <BrowserChrome
         tabs={tabs}
@@ -469,6 +484,7 @@ export default function App() {
           <BrowserViewport
             activeTabId={activeTabId}
             url={activeTab?.url || 'browser://search'}
+            reloadNonce={reloadNonce}
             onNavigate={handleNavigate}
             onTitleChange={handleTitleChange}
             showInspectorOverlay={showInspectorOverlay}

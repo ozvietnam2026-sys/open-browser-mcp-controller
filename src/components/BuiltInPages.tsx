@@ -19,24 +19,12 @@ import {
   BookOpen,
   CheckCircle2,
 } from 'lucide-react';
+import { builtInPageId } from '../../shared/browser-session';
 
 interface BuiltInPagesProps {
   url: string;
   onNavigate: (newUrl: string) => void;
   onPageLoaded?: (title: string) => void;
-}
-
-function builtInPageId(url: string): 'store' | 'forms' | 'news' | 'wikipedia' | 'search' {
-  const raw = url.trim().toLowerCase();
-  if (!raw.startsWith('browser://')) {
-    return 'search';
-  }
-  const id = raw.slice('browser://'.length).split(/[/?#]/)[0];
-  if (id === 'store') return 'store';
-  if (id === 'forms' || id === 'testlab') return 'forms';
-  if (id === 'news' || id === 'technews') return 'news';
-  if (id === 'wikipedia' || id === 'wiki') return 'wikipedia';
-  return 'search';
 }
 
 export const BuiltInPages: React.FC<BuiltInPagesProps> = ({

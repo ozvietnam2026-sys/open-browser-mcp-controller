@@ -15,6 +15,13 @@ import {
   NetworkLogEntry,
   McpLogItem,
 } from '../shared/browser-types.js';
+import { truncateForLog, urlsEquivalent } from '../shared/browser-session.js';
+
+const MAX_HISTORY = 40;
+const MAX_SCREENSHOTS = 3;
+const MAX_MCP_LOGS = 80;
+const MAX_CONSOLE_LOGS = 120;
+const MAX_NETWORK_LOGS = 120;
 
 class BrowserStateManager {
   private tabs: Map<string, BrowserTab> = new Map();
@@ -62,11 +69,20 @@ class BrowserStateManager {
   // UI Event SSE subscription
   public subscribeUiEvents(client: (event: string, data: any) => void): () => void {
     this.uiEventClients.add(client);
-    // Send initial snapshot
+    // Slim init — never shove a full DOM snapshot over SSE (causes lag on reconnect)
+    const snap = this.getDomSnapshot(this.activeTabId);
     client('init', {
       tabs: this.getAllTabs(),
       activeTabId: this.activeTabId,
-      domSnapshot: this.getDomSnapshot(this.activeTabId),
+      domSummary: snap
+        ? {
+            tabId: this.activeTabId,
+            title: snap.title,
+            url: snap.url,
+            elementCount: snap.interactiveElements?.length || 0,
+            timestamp: snap.timestamp,
+          }
+        : null,
     });
     return () => {
       this.uiEventClients.delete(client);
@@ -94,11 +110,11 @@ class BrowserStateManager {
       timestamp: Date.now(),
       direction,
       method,
-      data,
+      data: truncateForLog(data, 1800),
       status,
     };
     this.mcpLogs.unshift(logItem);
-    if (this.mcpLogs.length > 100) this.mcpLogs.pop();
+    if (this.mcpLogs.length > MAX_MCP_LOGS) this.mcpLogs.pop();
     this.broadcast('mcp_log', logItem);
   }
 
@@ -222,6 +238,14 @@ class BrowserStateManager {
       }
     }
 
+    // Same URL (e.g. SSE reconnect sync) — do NOT push history or flip isLoading.
+    // That loop was causing the UI to flicker / "reload" every few minutes on Vercel.
+    if (urlsEquivalent(tab.url, cleanUrl)) {
+      tab.isLoading = false;
+      tab.lastUpdated = Date.now();
+      return tab;
+    }
+
     tab.url = cleanUrl;
     tab.isLoading = true;
 
@@ -230,6 +254,11 @@ class BrowserStateManager {
       tab.history = tab.history.slice(0, tab.historyIndex + 1);
     }
     tab.history.push(cleanUrl);
+    if (tab.history.length > MAX_HISTORY) {
+      const overflow = tab.history.length - MAX_HISTORY;
+      tab.history = tab.history.slice(overflow);
+      tab.historyIndex = Math.max(0, tab.historyIndex - overflow);
+    }
     tab.historyIndex = tab.history.length - 1;
     tab.canGoBack = tab.historyIndex > 0;
     tab.canGoForward = false;
@@ -271,12 +300,30 @@ class BrowserStateManager {
   public setDomSnapshot(tabId: string, snapshot: DomSnapshot) {
     this.domSnapshots.set(tabId, snapshot);
     const tab = this.tabs.get(tabId);
+    let titleChanged = false;
     if (tab) {
-      tab.title = snapshot.title || tab.title;
+      const nextTitle = snapshot.title || tab.title;
+      titleChanged = nextTitle !== tab.title || tab.isLoading;
+      tab.title = nextTitle;
       tab.isLoading = false;
-      this.updateTab(tabId, { title: tab.title, isLoading: false });
+      tab.lastUpdated = Date.now();
+      // Lightweight meta sync only — NEVER broadcast full tabs_updated here.
+      // Previous code called updateTab() on every snapshot → React re-rendered the
+      // whole chrome + viewport on every proxy DOM postMessage (major lag source).
+      if (titleChanged) {
+        this.broadcast('tab_navigated', { tabId: tab.id, tab: { ...tab } });
+      }
     }
-    this.broadcast('dom_updated', { tabId, snapshot });
+    // Slim SSE payload — UI already has the full snapshot from postMessage / local scan
+    this.broadcast('dom_updated', {
+      tabId,
+      summary: {
+        title: snapshot.title,
+        url: snapshot.url,
+        elementCount: snapshot.interactiveElements?.length || 0,
+        timestamp: snapshot.timestamp,
+      },
+    });
   }
 
   public getDomSnapshot(tabId?: string): DomSnapshot | undefined {
@@ -286,6 +333,11 @@ class BrowserStateManager {
 
   public setScreenshot(tabId: string, base64DataUrl: string) {
     this.screenshotCache.set(tabId, base64DataUrl);
+    while (this.screenshotCache.size > MAX_SCREENSHOTS) {
+      const oldest = this.screenshotCache.keys().next().value;
+      if (oldest === undefined) break;
+      this.screenshotCache.delete(oldest);
+    }
     this.broadcast('screenshot_captured', { tabId, timestamp: Date.now() });
   }
 
@@ -309,7 +361,7 @@ class BrowserStateManager {
       timestamp: Date.now(),
     };
     this.consoleLogs.push(entry);
-    if (this.consoleLogs.length > 200) this.consoleLogs.shift();
+    if (this.consoleLogs.length > MAX_CONSOLE_LOGS) this.consoleLogs.shift();
     this.broadcast('console_log', entry);
   }
 
@@ -325,7 +377,7 @@ class BrowserStateManager {
       timestamp: Date.now(),
     };
     this.networkLogs.push(item);
-    if (this.networkLogs.length > 200) this.networkLogs.shift();
+    if (this.networkLogs.length > MAX_NETWORK_LOGS) this.networkLogs.shift();
     this.broadcast('network_log', item);
   }
 

@@ -18,6 +18,8 @@ import { sseClient } from '../services/sseClient';
 interface BrowserViewportProps {
   activeTabId: string;
   url: string;
+  /** Bumped by App on Reload to remount the proxied iframe. */
+  reloadNonce?: number;
   onNavigate: (url: string) => void;
   onTitleChange: (title: string) => void;
   showInspectorOverlay: boolean;
@@ -30,6 +32,7 @@ interface BrowserViewportProps {
 export const BrowserViewport: React.FC<BrowserViewportProps> = ({
   activeTabId,
   url,
+  reloadNonce = 0,
   onNavigate,
   onTitleChange,
   showInspectorOverlay,
@@ -168,6 +171,8 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
   const pageTitleRef = useRef(pageTitle);
   const activeTabIdRef = useRef(activeTabId);
   const isBuiltInRef = useRef(isBuiltIn);
+  const lastPostedFingerprintRef = useRef('');
+  const scanTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     onSnapshotUpdatedRef.current = onSnapshotUpdated;
@@ -176,6 +181,12 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
     activeTabIdRef.current = activeTabId;
     isBuiltInRef.current = isBuiltIn;
   });
+
+  useEffect(() => {
+    return () => {
+      if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+    };
+  }, []);
 
   // Scan interactive elements in built-in view
   const scanBuiltInElements = useCallback(() => {
@@ -272,6 +283,10 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
 
     onSnapshotUpdatedRef.current?.(snapshot);
 
+    const fingerprint = `${snapshot.url}|${snapshot.title}|${scanned.length}|${textExcerpt.length}`;
+    if (fingerprint === lastPostedFingerprintRef.current) return;
+    lastPostedFingerprintRef.current = fingerprint;
+
     fetch('/api/browser/dom-snapshot', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -279,18 +294,28 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
     }).catch(() => {});
   }, [url]);
 
+  const scheduleScan = useCallback(() => {
+    if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+    scanTimerRef.current = setTimeout(() => {
+      scanTimerRef.current = null;
+      scanBuiltInElements();
+    }, 350);
+  }, [scanBuiltInElements]);
+
   const handlePageLoaded = useCallback((title: string) => {
     setPageTitle((prev) => (prev === title ? prev : title));
     onTitleChangeRef.current?.(title);
-    setTimeout(scanBuiltInElements, 250);
-  }, [scanBuiltInElements]);
+    scheduleScan();
+  }, [scheduleScan]);
 
   useEffect(() => {
     if (isBuiltIn) {
-      const timer = setTimeout(scanBuiltInElements, 400);
-      return () => clearTimeout(timer);
+      scheduleScan();
+      return () => {
+        if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
+      };
     }
-  }, [isBuiltIn, url, activeTabId, scanBuiltInElements]);
+  }, [isBuiltIn, url, activeTabId, scheduleScan]);
 
   // Window postMessage listener for proxied iframe bridge
   useEffect(() => {
@@ -299,10 +324,15 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
       if (!data) return;
 
       if (data.type === 'MCP_DOM_SNAPSHOT' && data.snapshot) {
-        setElements(data.snapshot.interactiveElements || []);
+        const els = data.snapshot.interactiveElements || [];
+        setElements(els);
         setPageTitle(data.snapshot.title || 'Trang web');
         onTitleChange(data.snapshot.title || 'Trang web');
         onSnapshotUpdated?.(data.snapshot);
+
+        const fingerprint = `${data.snapshot.url}|${data.snapshot.title}|${els.length}|${(data.snapshot.textExcerpt || '').length}`;
+        if (fingerprint === lastPostedFingerprintRef.current) return;
+        lastPostedFingerprintRef.current = fingerprint;
 
         fetch('/api/browser/dom-snapshot', {
           method: 'POST',
@@ -781,8 +811,9 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
           />
         ) : (
           <iframe
+            key={`${activeTabId}:${url}:${reloadNonce}`}
             ref={iframeRef}
-            src={proxyUrl}
+            src={`${proxyUrl}&_r=${reloadNonce}`}
             title={pageTitle}
             className="w-full h-full border-0 bg-white"
             sandbox="allow-scripts allow-forms allow-same-origin allow-popups"
@@ -792,7 +823,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
         {/* DOM Inspector Element Bounding Boxes Overlay */}
         {showInspectorOverlay && isBuiltIn && (
           <div className="absolute inset-0 pointer-events-none z-30">
-            {elements.map((el) => {
+            {elements.slice(0, 80).map((el) => {
               const isHovered = hoveredRefId === el.refId;
               return (
                 <div
