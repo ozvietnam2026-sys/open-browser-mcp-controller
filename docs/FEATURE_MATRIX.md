@@ -1,4 +1,4 @@
-# Feature Matrix — Open Browser MCP Controller v4.1.2
+# Feature Matrix — Open Browser MCP Controller v4.1.3
 
 Inventory of advanced / lesser-known features researched from public sources and adoption status.
 Ideas are **reimplemented** (not copied) under compatible licenses; paid SaaS APIs are not required.
