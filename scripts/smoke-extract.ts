@@ -71,7 +71,7 @@ async function main() {
 
   await run('meta_status', async () => {
     const d = parse(await executeMetaTool('meta_status', {}));
-    if (d.version !== '4.1.2') throw new Error(`bad version ${d.version}`);
+    if (d.version !== '4.1.4') throw new Error(`bad version ${d.version}`);
     if (!Array.isArray(d.caps) || !d.caps.length) throw new Error('no caps');
     if (!('redisConfigured' in d) || !('persistBackend' in d)) throw new Error('missing persist flags');
     if (!('tavilyKeyPresent' in d) || !('jinaKeyPresent' in d)) throw new Error('missing search key flags');

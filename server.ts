@@ -122,7 +122,7 @@ app.post('/api/extract/:tool', async (req: Request, res: Response) => {
 app.get('/api/extract/health', (_req: Request, res: Response) => {
   res.json({
     ok: true,
-    version: '4.1.3',
+    version: '4.1.4',
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],
@@ -354,7 +354,9 @@ app.get('/api/browser/export', (_req: Request, res: Response) => {
 // -------------------------------------------------------------
 // Web Proxy Endpoint for External Pages
 // -------------------------------------------------------------
-app.get('/api/browser/proxy', (req: Request, res: Response) => {
+// All methods: HTML GET injects bridge + fetch/XHR rewrite; other verbs forward upstream.
+// Cookie jar not implemented — logged-in site sessions do not persist through this proxy.
+app.all('/api/browser/proxy', (req: Request, res: Response) => {
   ProxyEngine.handleProxy(req, res);
 });
 

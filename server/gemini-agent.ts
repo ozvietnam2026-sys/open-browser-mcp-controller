@@ -8,6 +8,21 @@ import { browserState } from './browser-state.js';
 import { McpServerHandler } from './mcp-server.js';
 import { AgentStep } from '../shared/browser-types.js';
 
+
+/**
+ * Environment-aware copy when GEMINI_API_KEY is missing.
+ * Never includes a real key value.
+ */
+export function getMissingGeminiKeyMessage(env: NodeJS.ProcessEnv = process.env): string {
+  if (env.VERCEL) {
+    return 'Chưa cấu hình GEMINI_API_KEY. Trên Vercel: Project Settings → Environment Variables, thêm GEMINI_API_KEY cho Production/Preview, rồi Redeploy.';
+  }
+  if (env.DISABLE_HMR === 'true' || env.AI_STUDIO === '1' || env.AI_STUDIO === 'true') {
+    return 'Chưa cấu hình GEMINI_API_KEY trong hệ thống. Vui lòng kiểm tra tab Settings > Secrets trong AI Studio.';
+  }
+  return 'Chưa cấu hình GEMINI_API_KEY. Đặt biến môi trường GEMINI_API_KEY trong .env hoặc secrets của host (Render/Docker), rồi khởi động lại máy chủ.';
+}
+
 export class GeminiBrowserAgent {
   private static activeJobs: Map<string, { abort: boolean }> = new Map();
 
@@ -55,7 +70,7 @@ const MAX_STEPS = 14;
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      const errorMsg = 'Chưa cấu hình GEMINI_API_KEY trong hệ thống. Vui lòng kiểm tra tab Settings > Secrets trong AI Studio.';
+      const errorMsg = getMissingGeminiKeyMessage();
       const errStep: AgentStep = {
         stepNumber: 1,
         thought: errorMsg,

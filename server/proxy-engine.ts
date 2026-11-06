@@ -1,60 +1,141 @@
 /**
  * Web Proxy Engine for Safe Browser Sandboxing
- * Proxies external web URLs, injects the browser MCP bridge for DOM inspection
- * and interactive event dispatching, and handles link rewrites.
+ * Proxies external web URLs (all HTTP methods), injects the browser MCP bridge for DOM
+ * inspection and interactive event dispatching, rewrites page fetch/XHR through this
+ * proxy to avoid CORS, and handles link rewrites.
+ *
+ * Cookie jar is intentionally not implemented in this pass — logged-in site sessions
+ * still will not persist through the HTTP proxy.
  */
 
 import { Request, Response } from 'express';
 import { browserState } from './browser-state.js';
+import { validateTargetUrlForSsrf } from './mcp-auth.js';
+import {
+  buildFetchRewriteSnippet,
+  buildOutboundProxyHeaders,
+  DESKTOP_CHROME_UA,
+  normalizeProxyTargetUrl,
+} from './proxy-url.js';
+
+function getOutboundBody(req: Request): BodyInit | undefined {
+  const method = (req.method || 'GET').toUpperCase();
+  if (method === 'GET' || method === 'HEAD' || method === 'OPTIONS') return undefined;
+  if (req.body === undefined || req.body === null || req.body === '') return undefined;
+  if (Buffer.isBuffer(req.body)) return new Uint8Array(req.body);
+  if (typeof req.body === 'string') return req.body;
+  if (typeof req.body === 'object') {
+    const ct = String(req.headers['content-type'] || '');
+    if (ct.includes('application/x-www-form-urlencoded')) {
+      return new URLSearchParams(req.body as Record<string, string>).toString();
+    }
+    return JSON.stringify(req.body);
+  }
+  return undefined;
+}
 
 export class ProxyEngine {
   public static async handleProxy(req: Request, res: Response) {
+    // CORS preflight for proxied XHR/fetch from the iframe
+    if ((req.method || '').toUpperCase() === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader(
+        'Access-Control-Allow-Methods',
+        'GET, POST, PUT, PATCH, DELETE, HEAD, OPTIONS'
+      );
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        req.headers['access-control-request-headers'] ||
+          'Content-Type, Accept, Accept-Language, X-Requested-With'
+      );
+      res.setHeader('Access-Control-Max-Age', '86400');
+      return res.status(204).end();
+    }
+
     const rawUrl = req.query.url as string;
     if (!rawUrl) {
       return res.status(400).send('Missing "url" parameter');
     }
 
-    let targetUrl: URL;
+    let targetHref: string;
     try {
-      targetUrl = new URL(rawUrl.startsWith('http') ? rawUrl : 'https://' + rawUrl);
-    } catch (err: any) {
+      targetHref = normalizeProxyTargetUrl(rawUrl);
+    } catch {
       return res.status(400).send(`Invalid URL: ${rawUrl}`);
     }
 
+    const ssrf = validateTargetUrlForSsrf(targetHref);
+    if (!ssrf.valid) {
+      return res.status(400).send(`Blocked target URL: ${ssrf.reason || 'SSRF policy'}`);
+    }
+
+    let targetUrl: URL;
+    try {
+      targetUrl = new URL(targetHref);
+    } catch {
+      return res.status(400).send(`Invalid URL: ${rawUrl}`);
+    }
+
+    const method = (req.method || 'GET').toUpperCase();
     const startTime = Date.now();
 
     try {
-      const response = await fetch(targetUrl.toString(), {
-        headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-          Accept:
-            'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'vi,en-US;q=0.9,en;q=0.8',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-        },
-        redirect: 'follow',
-      });
+      const outboundHeaders = buildOutboundProxyHeaders(
+        req.headers as Record<string, string | string[] | undefined>,
+        DESKTOP_CHROME_UA
+      );
 
-      const contentType = response.headers.get('content-type') || 'text/html';
+      // Document navigations need a navigate-like Accept when the page did not set one
+      if (method === 'GET' && !outboundHeaders['Accept']) {
+        outboundHeaders['Accept'] =
+          'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8';
+      }
+      if (!outboundHeaders['Accept-Language']) {
+        outboundHeaders['Accept-Language'] = 'vi,en-US;q=0.9,en;q=0.8';
+      }
+
+      const fetchInit: RequestInit = {
+        method,
+        headers: outboundHeaders,
+        redirect: 'follow',
+      };
+
+      const body = getOutboundBody(req);
+      if (body !== undefined) {
+        fetchInit.body = body;
+      }
+
+      const response = await fetch(targetUrl.toString(), fetchInit);
+
+      const contentType = response.headers.get('content-type') || 'application/octet-stream';
       const durationMs = Date.now() - startTime;
 
       browserState.addNetworkLog({
         tabId: (req.query.tabId as string) || browserState.getActiveTab().id,
         url: targetUrl.toString(),
-        method: 'GET',
+        method,
         status: response.status,
         durationMs,
         type: contentType.split(';')[0],
       });
 
-      // Pass non-HTML resources (images, css, js) directly
-      if (!contentType.includes('text/html')) {
+      const isHtmlDocument =
+        method === 'GET' && contentType.toLowerCase().includes('text/html');
+
+      // Non-HTML (JSON, XHR, assets, etc.) and non-GET: forward status + body
+      if (!isHtmlDocument) {
         const buffer = await response.arrayBuffer();
+        res.status(response.status);
         res.setHeader('Content-Type', contentType);
-        res.setHeader('Cache-Control', 'public, max-age=3600');
         res.setHeader('Access-Control-Allow-Origin', '*');
+        if (method === 'GET') {
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+        } else {
+          res.setHeader('Cache-Control', 'no-store');
+        }
+        // Forward a few safe response headers useful to page JS
+        const expose = response.headers.get('x-request-id') || response.headers.get('x-requested-with');
+        if (expose) res.setHeader('Access-Control-Expose-Headers', 'x-request-id');
         return res.send(Buffer.from(buffer));
       }
 
@@ -63,12 +144,13 @@ export class ProxyEngine {
       // Clean headers that prevent framing
       res.removeHeader('X-Frame-Options');
       res.removeHeader('Content-Security-Policy');
+      res.status(response.status);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.setHeader('Access-Control-Allow-Origin', '*');
 
       // Inject Base tag if not present to resolve relative URLs
-      const origin = targetUrl.origin;
       const baseTag = `<base href="${targetUrl.href}">`;
+      const fetchRewrite = buildFetchRewriteSnippet();
 
       // Bridge script injected into the proxied page to report interactive elements
       // and accept click/type commands from the parent browser application
@@ -77,6 +159,7 @@ export class ProxyEngine {
           (function() {
             try {
               window.__IS_MCP_BROWSER_PAGE__ = true;
+${fetchRewrite}
 
               function collectInteractiveElements() {
                 var selectors = 'a[href], button, input, textarea, select, [role="button"], [role="link"], [tabindex]:not([tabindex="-1"])';

@@ -3,8 +3,8 @@
 **EN** · In-app browser UI + MCP server with multi-strategy web extraction, CDP DevTools, agent mailbox, browser-AI helpers, tool profiles/caps, map/search/change-tracking.  
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
-Live (Vercel): https://open-browser-mcp-controller-ozvietnam.vercel.app  
-Version: **4.1.3** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
+Version: **4.1.4** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
