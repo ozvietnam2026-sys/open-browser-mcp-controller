@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { BrowserChrome } from './components/BrowserChrome';
 import { BrowserViewport } from './components/BrowserViewport';
 import { AiAgentPanel } from './components/AiAgentPanel';
@@ -19,8 +19,11 @@ import {
 import { Camera, Download, X } from 'lucide-react';
 import { sseClient } from './services/sseClient';
 
-export default function App() {
-  const [tabs, setTabs] = useState<BrowserTab[]>([
+
+const BROWSER_SESSION_KEY = 'obmc.browser.session';
+
+function getDefaultTabs(): BrowserTab[] {
+  return [
     {
       id: 'tab-1',
       title: 'AeroSearch - Tìm kiếm thông minh',
@@ -33,8 +36,71 @@ export default function App() {
       historyIndex: 0,
       lastUpdated: Date.now(),
     },
-  ]);
-  const [activeTabId, setActiveTabId] = useState<string>('tab-1');
+  ];
+}
+
+function readPersistedSession(): { tabs: BrowserTab[]; activeTabId: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(BROWSER_SESSION_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed?.tabs) || parsed.tabs.length === 0) return null;
+    if (!parsed.tabs.every((t: BrowserTab) => t && typeof t.id === 'string' && typeof t.url === 'string')) {
+      return null;
+    }
+    return {
+      tabs: parsed.tabs,
+      activeTabId:
+        typeof parsed.activeTabId === 'string' ? parsed.activeTabId : parsed.tabs[0].id,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function isFreshDefaultSession(tabs: BrowserTab[] | undefined): boolean {
+  if (!tabs || tabs.length !== 1) return false;
+  const url = (tabs[0].url || '').toLowerCase();
+  const history = tabs[0].history || [];
+  return (url === 'browser://search' || url === '') && history.length <= 1;
+}
+
+function hasUserSession(tabs: BrowserTab[] | undefined): boolean {
+  if (!tabs || tabs.length === 0) return false;
+  return tabs.some((t) => {
+    const url = t.url || '';
+    if (url.startsWith('http://') || url.startsWith('https://')) return true;
+    if (url.startsWith('browser://search?')) return true;
+    if (url.startsWith('browser://') && url !== 'browser://search') return true;
+    if (t.history && t.history.length > 1) return true;
+    return false;
+  });
+}
+
+function syncTabUrlToServer(tab: BrowserTab | undefined) {
+  if (!tab?.url) return;
+  fetch('/api/mcp/rpc', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      jsonrpc: '2.0',
+      id: Date.now(),
+      method: 'tools/call',
+      params: { name: 'browser_navigate', arguments: { url: tab.url, tabId: tab.id } },
+    }),
+  }).catch(() => {});
+}
+
+export default function App() {
+  const [tabs, setTabs] = useState<BrowserTab[]>(() => readPersistedSession()?.tabs ?? getDefaultTabs());
+  const [activeTabId, setActiveTabId] = useState<string>(
+    () => readPersistedSession()?.activeTabId ?? 'tab-1'
+  );
+  const tabsRef = useRef(tabs);
+  const activeTabIdRef = useRef(activeTabId);
+  tabsRef.current = tabs;
+  activeTabIdRef.current = activeTabId;
 
   // Side panels state
   const [activePanel, setActivePanel] = useState<'agent' | 'mcp' | 'inspector' | 'devtools' | null>(
@@ -54,8 +120,17 @@ export default function App() {
 
   // Listen to SSE events from server via singleton sseClient
   useEffect(() => {
+    const shouldKeepLocalSession = (incomingTabs: BrowserTab[] | undefined) =>
+      isFreshDefaultSession(incomingTabs) && hasUserSession(tabsRef.current);
+
     const unsubInit = sseClient.subscribe('init', (data) => {
       if (data?.tabs && data.tabs.length > 0) {
+        if (shouldKeepLocalSession(data.tabs)) {
+          const keep =
+            tabsRef.current.find((t) => t.id === activeTabIdRef.current) || tabsRef.current[0];
+          syncTabUrlToServer(keep);
+          return;
+        }
         setTabs(data.tabs);
       }
       if (data?.activeTabId) {
@@ -64,7 +139,12 @@ export default function App() {
     });
 
     const unsubTabs = sseClient.subscribe('tabs_updated', (data) => {
-      if (data?.tabs) setTabs(data.tabs);
+      if (data?.tabs) {
+        if (shouldKeepLocalSession(data.tabs)) {
+          return;
+        }
+        setTabs(data.tabs);
+      }
       if (data?.activeTabId) setActiveTabId(data.activeTabId);
     });
 
@@ -94,6 +174,17 @@ export default function App() {
       unsubVisual();
     };
   }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        BROWSER_SESSION_KEY,
+        JSON.stringify({ tabs, activeTabId })
+      );
+    } catch {
+      // Ignore quota / private-mode failures
+    }
+  }, [tabs, activeTabId]);
 
   // Tab Operations
   const handleSelectTab = (id: string) => {

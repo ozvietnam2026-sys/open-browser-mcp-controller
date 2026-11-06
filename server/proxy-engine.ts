@@ -320,13 +320,8 @@ export class ProxyEngine {
             <h2>⚠️ Không thể kết nối tới trang web</h2>
             <p>Trang web <code>${targetUrl.toString()}</code> không phản hồi hoặc chặn yêu cầu proxy (CORS/Bot protection).</p>
             <p><strong>Lỗi chi tiết:</strong> ${err?.message || 'Network Timeout'}</p>
-            <p>Bạn có thể thử các trang web mở tích hợp sẵn trong trình duyệt:</p>
-            <ul>
-              <li><code>browser://search</code> - AeroSearch</li>
-              <li><code>browser://store</code> - NovaTech Store</li>
-              <li><code>browser://forms</code> - Test Lab Form Playground</li>
-              <li><code>browser://news</code> - TechNews</li>
-            </ul>
+            <p>Trình duyệt vẫn đang đứng ở đúng địa chỉ vừa mở. Đừng chuyển sang các trang mẫu (NovaTech Store, AeroSearch) để thay thế trang này — đó chỉ là trang test demo.</p>
+            <p>Nếu trang thật chặn lớp proxy (hay gặp với Taobao, 1688, Tmall), hãy tải lại hoặc dùng phiên Chrome thật trên máy chủ. Các trang mẫu <code>browser://store</code> / <code>browser://search</code> không phải nhà cung cấp thật.</p>
           </div>
         </body>
         </html>

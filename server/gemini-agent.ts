@@ -79,7 +79,7 @@ const MAX_STEPS = 14;
     const toolDeclarations = [
       {
         name: 'browser_navigate',
-        description: 'Điều hướng trình duyệt đến một URL (ví dụ: browser://search, browser://store, browser://forms, browser://news hoặc https://wikipedia.org)',
+        description: 'Điều hướng trình duyệt đến URL người dùng đang cần. Với website thật hãy dùng đúng https:// (ví dụ https://www.taobao.com). Chỉ dùng browser://search, browser://store, browser://forms, browser://news khi người dùng muốn trang mẫu demo.',
         parameters: {
           type: Type.OBJECT,
           properties: {
@@ -213,12 +213,18 @@ const MAX_STEPS = 14;
 Bạn là Agent AI điều khiển trình duyệt web thông qua Model Context Protocol (MCP).
 Nhiệm vụ của bạn: Hoàn thành mục tiêu của người dùng trên trình duyệt bằng cách thực hiện tuần tự các thao tác (navigate, get DOM, click, hover, type, select, scroll, screenshot).
 
-HỆ THỐNG TRANG WEB MẪU TÍCH HỢP SẴN:
-1. "browser://search" (AeroSearch): Công cụ tìm kiếm với ô nhập liệu, nút tìm kiếm, kết quả tìm kiếm phong phú.
-2. "browser://store" (NovaTech Store): Cửa hàng công nghệ trực tuyến với danh mục sản phẩm, bộ lọc, xem chi tiết, nút "Thêm vào giỏ", giỏ hàng và thanh toán.
-3. "browser://forms" (Test Lab Forms): Phòng thí nghiệm form với các input đăng ký, checkbox, select và nút xác nhận.
-4. "browser://news" (TechNews): Cổng thông tin công nghệ với bài viết, bình luận và trending topics.
+HỆ THỐNG TRANG WEB MẪU TÍCH HỢP SẴN (chỉ dùng khi người dùng muốn thử demo):
+1. "browser://search" (AeroSearch): Công cụ tìm kiếm mẫu trong trình duyệt.
+2. "browser://store" (NovaTech Store): Cửa hàng công nghệ MẪU để thử click/giỏ hàng — KHÔNG phải website mua hàng hay nhà cung cấp thật.
+3. "browser://forms" (Test Lab Forms): Phòng thí nghiệm form mẫu.
+4. "browser://news" (TechNews): Cổng tin mẫu.
 5. "browser://wikipedia" hoặc https://vi.wikipedia.org: Bách khoa toàn thư mở.
+
+QUAN TRỌNG — TRANG WEB THẬT:
+- Nếu tab hiện tại đã là http/https (ví dụ taobao.com, 1688.com, tmall.com, hoặc bất kỳ website thật nào), bạn PHẢI hoàn thành nhiệm vụ trên chính trang đó hoặc các trang cùng website.
+- KHÔNG được điều hướng sang browser://store (NovaTech), browser://search, browser://forms hay browser://news khi người dùng yêu cầu tìm giá, tìm nhà cung cấp, mua hàng, hoặc thao tác trên website thật.
+- NovaTech Store chỉ là trang test mặc định — không dùng nó thay cho Taobao/1688 hay bất kỳ nhà cung cấp thật nào.
+- Chỉ mở trang mẫu browser:// khi người dùng nêu rõ tên trang demo, hoặc khi tab hiện tại vốn đã là trang mẫu và nhiệm vụ thuộc về trang đó.
 
 NGUYÊN TẮC HÀNH ĐỘNG:
 - Sau mỗi thao tác quan trọng (navigate, click, type), hãy quan sát trạng thái mới.

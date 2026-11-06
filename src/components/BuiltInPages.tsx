@@ -26,26 +26,39 @@ interface BuiltInPagesProps {
   onPageLoaded?: (title: string) => void;
 }
 
+function builtInPageId(url: string): 'store' | 'forms' | 'news' | 'wikipedia' | 'search' {
+  const raw = url.trim().toLowerCase();
+  if (!raw.startsWith('browser://')) {
+    return 'search';
+  }
+  const id = raw.slice('browser://'.length).split(/[/?#]/)[0];
+  if (id === 'store') return 'store';
+  if (id === 'forms' || id === 'testlab') return 'forms';
+  if (id === 'news' || id === 'technews') return 'news';
+  if (id === 'wikipedia' || id === 'wiki') return 'wikipedia';
+  return 'search';
+}
+
 export const BuiltInPages: React.FC<BuiltInPagesProps> = ({
   url,
   onNavigate,
   onPageLoaded,
 }) => {
-  const normalizedUrl = url.toLowerCase();
+  const pageId = builtInPageId(url);
 
-  if (normalizedUrl.includes('store') || normalizedUrl.includes('novatech')) {
+  if (pageId === 'store') {
     return <StorePage onNavigate={onNavigate} onPageLoaded={onPageLoaded} />;
   }
 
-  if (normalizedUrl.includes('forms') || normalizedUrl.includes('testlab')) {
+  if (pageId === 'forms') {
     return <FormsPage onPageLoaded={onPageLoaded} />;
   }
 
-  if (normalizedUrl.includes('news') || normalizedUrl.includes('technews')) {
+  if (pageId === 'news') {
     return <NewsPage onNavigate={onNavigate} onPageLoaded={onPageLoaded} />;
   }
 
-  if (normalizedUrl.includes('wiki') || normalizedUrl.includes('wikipedia')) {
+  if (pageId === 'wikipedia') {
     return <WikipediaPage onNavigate={onNavigate} onPageLoaded={onPageLoaded} />;
   }
 

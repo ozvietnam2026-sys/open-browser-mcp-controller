@@ -7,13 +7,13 @@ export const MCP_BROWSER_TOOLS: McpToolDefinition[] = [
   {
     name: 'browser_navigate',
     description:
-      'Điều hướng tab hiện tại (hoặc tab chỉ định) tới một địa chỉ URL mới (hỗ trợ https://, http://, hoặc browser://search, browser://store, browser://forms, browser://news).',
+      'Điều hướng tab hiện tại (hoặc tab chỉ định) tới một địa chỉ URL mới. Với website thật hãy dùng https:// đầy đủ (ví dụ https://www.taobao.com). Chỉ dùng browser://search, browser://store, browser://forms, browser://news khi người dùng muốn trang mẫu demo.',
     inputSchema: {
       type: 'object',
       properties: {
         url: {
           type: 'string',
-          description: 'Địa chỉ URL cần mở (ví dụ: https://wikipedia.org hoặc browser://store).',
+          description: 'Địa chỉ URL cần mở (ví dụ: https://www.taobao.com). Chỉ dùng browser://store khi muốn trang demo NovaTech.',
         },
         tabId: {
           type: 'string',
