@@ -19,6 +19,8 @@ import { executeAiWebTool, AI_WEB_TOOL_NAMES } from './server/ai-web/index.js';
 import { ProxyEngine } from './server/proxy-engine.js';
 import { GeminiBrowserAgent } from './server/gemini-agent.js';
 
+import { requireMcpAuth } from './server/mcp-auth.js';
+
 dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
@@ -49,28 +51,33 @@ app.use(cors());
 app.use(express.json({ limit: '35mb' }));
 app.use(express.urlencoded({ extended: true, limit: '35mb' }));
 
+// Unauthenticated health check endpoint
+app.get('/health', (_req: Request, res: Response) => {
+  res.json({ status: 'healthy', timestamp: new Date().toISOString() });
+});
+
 // -------------------------------------------------------------
-// Model Context Protocol (MCP) Endpoints
+// Model Context Protocol (MCP) Endpoints (Protected by requireMcpAuth)
 // -------------------------------------------------------------
 
 // Official MCP SSE Transport
-app.get('/mcp/sse', (req: Request, res: Response) => {
+app.get('/mcp/sse', requireMcpAuth, (req: Request, res: Response) => {
   McpServerHandler.handleSse(req, res);
 });
 
 // Official MCP Message Endpoint
-app.post('/mcp/messages', (req: Request, res: Response) => {
+app.post('/mcp/messages', requireMcpAuth, (req: Request, res: Response) => {
   McpServerHandler.handleMessages(req, res);
 });
 
 // Direct JSON-RPC endpoint for simple HTTP clients / curl / test scripts
-app.post('/api/mcp/rpc', (req: Request, res: Response) => {
+app.post('/api/mcp/rpc', requireMcpAuth, (req: Request, res: Response) => {
   McpServerHandler.handleDirectRpc(req, res);
 });
 
 // Streamable HTTP MCP endpoint (GitHub MCP style single /mcp URL)
 // Accepts JSON-RPC over POST; also supports simple GET discovery.
-app.all('/mcp', async (req: Request, res: Response) => {
+app.all('/mcp', requireMcpAuth, async (req: Request, res: Response) => {
   if (req.method === 'GET') {
     return res.json({
       protocol: 'mcp',
@@ -167,7 +174,7 @@ app.post('/api/ai/:tool', async (req: Request, res: Response) => {
 });
 
 // MCP Tools schema list
-app.get('/api/mcp/tools', (_req: Request, res: Response) => {
+app.get('/api/mcp/tools', requireMcpAuth, (_req: Request, res: Response) => {
   res.json({
     tools: getVisibleTools(),
     toolCount: getVisibleTools().length,
@@ -193,7 +200,7 @@ app.get('/api/mcp/tools', (_req: Request, res: Response) => {
 });
 
 // MCP Connection Config generator
-app.get('/api/mcp/config', (req: Request, res: Response) => {
+app.get('/api/mcp/config', requireMcpAuth, (req: Request, res: Response) => {
   const host = req.get('x-forwarded-host') || req.get('host') || `localhost:${PORT}`;
   const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
   const baseUrl = process.env.APP_URL || `${protocol}://${host}`;
@@ -227,7 +234,7 @@ app.get('/api/mcp/config', (req: Request, res: Response) => {
 });
 
 // MCP Logs
-app.get('/api/mcp/logs', (_req: Request, res: Response) => {
+app.get('/api/mcp/logs', requireMcpAuth, (_req: Request, res: Response) => {
   res.json(browserState.getMcpLogs());
 });
 

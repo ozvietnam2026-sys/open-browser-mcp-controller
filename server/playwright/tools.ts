@@ -1,4 +1,5 @@
 import { McpToolDefinition } from '../../shared/browser-types.js';
+import { validateTargetUrlForSsrf } from '../mcp-auth.js';
 import {
   playwrightAvailable,
   playwrightUnavailableMessage,
@@ -512,6 +513,23 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
     description: 'Close Playwright session. For CDP mode, detaches without quitting the user Chrome.',
     inputSchema: { type: 'object', properties: {} },
   },
+  {
+    name: 'pw_lighthouse',
+    description:
+      'Playwright / Chrome: Run Lighthouse performance and accessibility analysis on a public URL. Requires Playwright/Chrome host.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'Public HTTP/HTTPS URL' },
+        categories: {
+          type: 'array',
+          items: { type: 'string' },
+          description: '["performance", "accessibility", "best-practices", "seo"]',
+        },
+      },
+      required: ['url'],
+    },
+  },
 ];
 
 export const PLAYWRIGHT_TOOL_NAMES = new Set(MCP_PLAYWRIGHT_TOOLS.map((t) => t.name));
@@ -536,6 +554,89 @@ async function guard(tool: string, fn: () => Promise<any>) {
 }
 
 export async function executePlaywrightTool(name: string, args: Record<string, any>): Promise<any> {
+  if (name === 'pw_lighthouse') {
+    const { url, categories } = args;
+    if (!url) throw new Error('Missing parameter: url');
+
+    // 1. SSRF Validation
+    const ssrf = validateTargetUrlForSsrf(url);
+    if (!ssrf.valid) {
+      return textResult(
+        JSON.stringify(
+          {
+            success: false,
+            error: 'ssrf_blocked',
+            message: ssrf.reason,
+          },
+          null,
+          2
+        )
+      );
+    }
+
+    // 2. Capability Check
+    if (!playwrightAvailable()) {
+      return textResult(
+        JSON.stringify(
+          {
+            success: false,
+            error: 'unsupported',
+            capability: 'playwright_lighthouse',
+            message: 'Playwright / Chrome environment is unavailable on this host',
+          },
+          null,
+          2
+        )
+      );
+    }
+
+    // 3. Execution when Playwright is available
+    try {
+      const p = await getPage();
+      const startTime = Date.now();
+      await p.goto(url, { waitUntil: 'domcontentloaded', timeout: 25000 });
+      const pageTitle = await p.title();
+
+      const metrics = await p.evaluate(() => {
+        const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+        const timing = performance.timing;
+        return {
+          loadTimeMs: nav ? Math.round(nav.loadEventEnd - nav.startTime) : timing.loadEventEnd - timing.navigationStart,
+          domContentLoadedMs: nav ? Math.round(nav.domContentLoadedEventEnd - nav.startTime) : timing.domContentLoadedEventEnd - timing.navigationStart,
+          ttfbMs: nav ? Math.round(nav.responseStart - nav.requestStart) : timing.responseStart - timing.requestStart,
+        };
+      });
+
+      return textResult(
+        JSON.stringify(
+          {
+            success: true,
+            url,
+            title: pageTitle,
+            metrics,
+            categories: categories || ['performance', 'accessibility'],
+            durationMs: Date.now() - startTime,
+            summary: 'Playwright Lighthouse analysis completed.',
+          },
+          null,
+          2
+        )
+      );
+    } catch (err: any) {
+      return textResult(
+        JSON.stringify(
+          {
+            success: false,
+            error: 'execution_failed',
+            message: err?.message || 'Failed to execute Playwright analysis',
+          },
+          null,
+          2
+        )
+      );
+    }
+  }
+
   return guard(name, async () => {
     switch (name) {
       case 'pw_connect': {

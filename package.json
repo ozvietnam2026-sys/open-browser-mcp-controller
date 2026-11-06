@@ -12,7 +12,8 @@
     "mcp:stdio": "tsx scripts/mcp-stdio.ts",
     "smoke": "tsx scripts/smoke-extract.ts",
     "clean": "rm -rf dist",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "tsx --test tests/**/*.test.ts"
   },
   "dependencies": {
     "@google/genai": "^1.30.0",
