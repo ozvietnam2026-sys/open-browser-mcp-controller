@@ -168,6 +168,25 @@ Channel **obmc-gateway** đã tạo trên 9Router của team (`192.168.1.125:201
 | AI Studio UI | — | bị chặn permission (project/key) |
 | Page-proxy POST generateContent | 57–64s | đường xấu, không dùng |
 
+## Phụ lục 4: tài khoản Pro trên app Gemini + thêm channel flash-lite (tối 7/11/2026)
+
+- Vào app Gemini bằng Pro (`gemini.wed@gmail.com`, URL `?authuser=2`): mode mặc định là **4 Argon**; bộ chọn chế độ gồm **3.5 Flash-Lite** (nhanh nhất) · **3.8 Flash** · **3.1 Pro** (suy luận nâng cao) · **4 Argon** (nhiệm vụ phức tạp) + submenu **Cấp độ tư duy**.
+- **Argon đang quá tải** (tối 7/11): app tự trả bằng model khác kèm thông báo "Nhu cầu sử dụng các mô hình tiên tiến hiện đang ở mức cao… không tính vào hạn mức của bạn" — khớp lỗi 503 high-demand phía API cùng ngày. Không đo được Argon lúc cao điểm.
+- **Số đo UI trên Pro**: mode **3.1 Pro = 4,65s** (câu benchmark chuẩn) — nhanh hơn cả mode Flash trên tài khoản thường (5,8s).
+- **Channel 9Router thêm `obmc/gemini-flash-lite-latest`** — đo trọn vòng dây: **1,45s** 🏆 (nhanh nhất mọi đường đã đo), bản ghi QA tự lưu `qa-mw6bmqgk-gujer`.
+
+### Bảng tốc độ cập nhật (đo thực 7/11/2026)
+
+| Đường | Thời gian |
+|---|---|
+| 9Router → OBMC `obmc/gemini-flash-lite-latest` | **1,45s** 🏆 |
+| OBMC API server-side (`/api/prompt/run`) | 1,2–2,2s |
+| 9Router → OBMC `obmc/gemini-3.5-flash` | 4,6s |
+| Gemini UI Pro — mode 3.1 Pro | 4,65s |
+| Gemini UI thường — mode Flash | 5,8s |
+| Gemini UI Pro — 4 Argon | quá tải, tự hạ cấp |
+| Page-proxy POST | 57–64s (loại) |
+
 ## Nguồn
 
 - Giao diện sống `aistudio.google.com` phiên `ceo@ngantin.vn`, 7/11/2026 (mọi mục ✅).
