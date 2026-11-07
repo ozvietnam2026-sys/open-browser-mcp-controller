@@ -141,12 +141,14 @@ export const BrowserChrome: React.FC<BrowserChromeProps> = ({
         <div className="flex items-center gap-2 px-3 text-[11px] text-slate-400">
           <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-xs shadow-emerald-500/50" />
           <span className="font-mono text-[10px] text-emerald-400 font-medium">MCP SERVER READY</span>
-          <span className="font-mono text-[10px] text-slate-500" title="obmc-proxy-cors-20261106 obmc-proxy-basehref-20261107 obmc-captcha-drag-20261107 obmc-challenge-detect-20261107 obmc-mic-search-20261107">v4.1.8</span>
+          <span className="font-mono text-[10px] text-slate-500" title="obmc-proxy-cors-20261106 obmc-proxy-basehref-20261107 obmc-captcha-drag-20261107 obmc-challenge-detect-20261107 obmc-mic-search-20261107 obmc-nav-wait-20261107 obmc-final-nudge-20261107">v4.1.9</span>
           <span className="hidden" aria-hidden="true">obmc-proxy-cors-20261106</span>
           <span className="hidden" aria-hidden="true">obmc-proxy-basehref-20261107</span>
           <span className="hidden" aria-hidden="true">obmc-captcha-drag-20261107</span>
           <span className="hidden" aria-hidden="true">obmc-challenge-detect-20261107</span>
           <span className="hidden" aria-hidden="true">obmc-mic-search-20261107</span>
+          <span className="hidden" aria-hidden="true">obmc-nav-wait-20261107</span>
+          <span className="hidden" aria-hidden="true">obmc-final-nudge-20261107</span>
           <span className="text-slate-600">|</span>
           <span className="font-mono text-[10px] text-slate-400">:3000/mcp/sse</span>
         </div>

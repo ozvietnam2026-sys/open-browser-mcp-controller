@@ -24,7 +24,7 @@ const MAX_MCP_LOGS = 80;
 const MAX_CONSOLE_LOGS = 120;
 const MAX_NETWORK_LOGS = 120;
 
-class BrowserStateManager {
+export class BrowserStateManager {
   private tabs: Map<string, BrowserTab> = new Map();
   private activeTabId: string = 'tab-1';
   private domSnapshots: Map<string, DomSnapshot> = new Map();
@@ -333,7 +333,15 @@ class BrowserStateManager {
   public setDomSnapshot(tabId: string, snapshot: DomSnapshot) {
     const tab = this.tabs.get(tabId);
     if (!tab || !matchesDocument(tab, snapshot) || !Array.isArray(snapshot.interactiveElements) ||
-      typeof snapshot.textExcerpt !== 'string' || typeof snapshot.simplifiedTree !== 'string') return false;
+      typeof snapshot.textExcerpt !== 'string' || typeof snapshot.simplifiedTree !== 'string') {
+      // obmc-nav-wait-20261107 — a silent 409 hid why documents never bound; keep the strictness, log the mismatch.
+      console.warn('[setDomSnapshot] rejected', {
+        reason: !tab ? 'tab-not-found' : !matchesDocument(tab, snapshot) ? 'identity-mismatch' : 'shape-invalid',
+        tabUrl: tab?.url, tabNavigationId: tab?.navigationId ?? 0,
+        snapshotUrl: snapshot?.url, snapshotNavigationId: snapshot?.navigationId,
+      });
+      return false;
+    }
     this.domSnapshots.set(tabId, snapshot);
     let titleChanged = false;
     if (tab) {
@@ -473,22 +481,26 @@ class BrowserStateManager {
     });
   }
 
-  public async waitForDocument(tabId: string, timeoutMs = 2500): Promise<BrowserCommandResult> {
-    const tab = this.tabs.get(tabId);
-    const identity = tab && { tabId, url: tab.url, navigationId: tab.navigationId ?? 0 };
+  // obmc-nav-wait-20261107 — wait for the NEWEST document, not the identity captured at call time.
+  // A superseding navigation (Enter in a site search box, second navigate, second UI client) used to
+  // break the loop and report failure while the page was still loading; now we keep polling until the
+  // snapshot binds to whatever the current document is, or the deadline passes.
+  public async waitForDocument(tabId: string, timeoutMs = 10000): Promise<BrowserCommandResult> {
     const deadline = Date.now() + timeoutMs;
-    while (tab && identity && matchesDocument(tab, identity)) {
+    while (Date.now() < deadline) {
+      const tab = this.tabs.get(tabId);
+      if (!tab) return { commandId: 'navigation', success: false, error: 'Tab not found; target document not confirmed' };
       const snapshot = this.getDomSnapshot(tabId);
-      if (snapshot) {
+      if (snapshot && matchesDocument(tab, snapshot)) {
         const data = classifyChallenge(tab, snapshot);
         const success = !['fetch_error', 'cors_error', 'empty_or_not_ready', 'stale_or_disconnected'].includes(data.state);
         return { commandId: 'navigation', success, data, error: success ? undefined : `Target document not ready: ${data.state}` };
       }
+      // No frontend connected → nobody will deliver the document later; fail fast instead of burning the timeout.
       if (!this.uiEventClients.size) return { commandId: 'navigation', success: false, error: 'UI disconnected; target document not confirmed' };
-      if (Date.now() >= deadline) break;
-      await new Promise(resolve => setTimeout(resolve, 50));
+      await new Promise(resolve => setTimeout(resolve, 80));
     }
-    return { commandId: 'navigation', success: false, error: 'Navigation timeout or superseded; target document not confirmed' };
+    return { commandId: 'navigation', success: false, error: `Navigation timeout (${timeoutMs}ms); target document not confirmed` };
   }
 
   public resolveCommandResult(result: BrowserCommandResult) {

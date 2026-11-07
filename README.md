@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.8** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Version: **4.1.9** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
@@ -19,6 +19,13 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.9 — navigation wait re-bind + final-answer format nudge (`obmc-nav-wait-20261107`, `obmc-final-nudge-20261107`)
+
+- `waitForDocument` no longer fails when a newer navigation supersedes the one it started with: it keeps polling until the snapshot binds to the **current** document (default budget 2.5s → 10s; proxied marketplace pages routinely need more than 2.5s). This fixes the storm where `browser_navigate` reported "Navigation timeout or superseded" while the tab URL actually advanced, and every later `browser_get_dom` stayed `stale_or_disconnected` until all steps burned out.
+- `setDomSnapshot` still rejects mismatched documents (409) but now logs the identity mismatch server-side, so a never-binding document is debuggable instead of silent.
+- Agent loop: a prose final answer is a **format slip, not task failure**. Before fail-closing and discarding a grounded answer, the model gets exactly one nudge to restate it as the required JSON (`{"outcome","answer","evidence"}`).
+- Known limitation (unchanged): the server keeps ONE shared browser session (`browserState` singleton, `tab-1`) per warm instance. Two people driving the app at the same time will interleave navigations and trip over each other — one pilot at a time until per-session isolation lands.
 
 ### v4.1.8 — Made-in-China search URLs + not-available classification (`obmc-mic-search-20261107`)
 

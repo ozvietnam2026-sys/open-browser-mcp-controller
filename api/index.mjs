@@ -98462,7 +98462,16 @@ var BrowserStateManager = class {
   // DOM Snapshot Management
   setDomSnapshot(tabId, snapshot) {
     const tab = this.tabs.get(tabId);
-    if (!tab || !matchesDocument(tab, snapshot) || !Array.isArray(snapshot.interactiveElements) || typeof snapshot.textExcerpt !== "string" || typeof snapshot.simplifiedTree !== "string") return false;
+    if (!tab || !matchesDocument(tab, snapshot) || !Array.isArray(snapshot.interactiveElements) || typeof snapshot.textExcerpt !== "string" || typeof snapshot.simplifiedTree !== "string") {
+      console.warn("[setDomSnapshot] rejected", {
+        reason: !tab ? "tab-not-found" : !matchesDocument(tab, snapshot) ? "identity-mismatch" : "shape-invalid",
+        tabUrl: tab?.url,
+        tabNavigationId: tab?.navigationId ?? 0,
+        snapshotUrl: snapshot?.url,
+        snapshotNavigationId: snapshot?.navigationId
+      });
+      return false;
+    }
     this.domSnapshots.set(tabId, snapshot);
     let titleChanged = false;
     if (tab) {
@@ -98576,22 +98585,25 @@ var BrowserStateManager = class {
       this.broadcast("execute_command", command);
     });
   }
-  async waitForDocument(tabId, timeoutMs = 2500) {
-    const tab = this.tabs.get(tabId);
-    const identity = tab && { tabId, url: tab.url, navigationId: tab.navigationId ?? 0 };
+  // obmc-nav-wait-20261107 — wait for the NEWEST document, not the identity captured at call time.
+  // A superseding navigation (Enter in a site search box, second navigate, second UI client) used to
+  // break the loop and report failure while the page was still loading; now we keep polling until the
+  // snapshot binds to whatever the current document is, or the deadline passes.
+  async waitForDocument(tabId, timeoutMs = 1e4) {
     const deadline = Date.now() + timeoutMs;
-    while (tab && identity && matchesDocument(tab, identity)) {
+    while (Date.now() < deadline) {
+      const tab = this.tabs.get(tabId);
+      if (!tab) return { commandId: "navigation", success: false, error: "Tab not found; target document not confirmed" };
       const snapshot = this.getDomSnapshot(tabId);
-      if (snapshot) {
+      if (snapshot && matchesDocument(tab, snapshot)) {
         const data2 = classifyChallenge(tab, snapshot);
         const success = !["fetch_error", "cors_error", "empty_or_not_ready", "stale_or_disconnected"].includes(data2.state);
         return { commandId: "navigation", success, data: data2, error: success ? void 0 : `Target document not ready: ${data2.state}` };
       }
       if (!this.uiEventClients.size) return { commandId: "navigation", success: false, error: "UI disconnected; target document not confirmed" };
-      if (Date.now() >= deadline) break;
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 80));
     }
-    return { commandId: "navigation", success: false, error: "Navigation timeout or superseded; target document not confirmed" };
+    return { commandId: "navigation", success: false, error: `Navigation timeout (${timeoutMs}ms); target document not confirmed` };
   }
   resolveCommandResult(result) {
     const pending = this.pendingCommands.get(result.commandId);
@@ -117906,6 +117918,17 @@ function getMissingGeminiKeyMessage(env = process.env) {
   }
   return "Ch\u01B0a c\u1EA5u h\xECnh GEMINI_API_KEY. \u0110\u1EB7t bi\u1EBFn m\xF4i tr\u01B0\u1EDDng GEMINI_API_KEY trong .env ho\u1EB7c secrets c\u1EE7a host (Render/Docker), r\u1ED3i kh\u1EDFi \u0111\u1ED9ng l\u1EA1i m\xE1y ch\u1EE7.";
 }
+function parseFinalProposal(text3) {
+  try {
+    const proposal = JSON.parse(text3.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+    if (proposal && typeof proposal === "object" && !Array.isArray(proposal) && ["completed", "blocked", "needs_user", "failed"].includes(proposal.outcome)) {
+      return proposal;
+    }
+  } catch {
+  }
+  return null;
+}
+var FINAL_ANSWER_NUDGE = `H\u1ED3i \u0111\xE1p cu\u1ED1i ch\u01B0a \u0111\xFAng \u0111\u1ECBnh d\u1EA1ng. KH\xD4NG g\u1ECDi c\xF4ng c\u1EE5. Tr\u1EA3 l\u1EDDi l\u1EA1i NGAY B\u1EB0NG M\u1ED8T JSON thu\u1EA7n duy nh\u1EA5t theo \u0111\xFAng d\u1EA1ng: {"outcome":"completed|blocked|needs_user|failed","answer":"tr\u1EA3 l\u1EDDi ti\u1EBFng Vi\u1EC7t","evidence":"tr\xEDch nguy\xEAn v\u0103n \xEDt nh\u1EA5t 8 k\xFD t\u1EF1 t\u1EEB DOM hi\u1EC7n t\u1EA1i"}. Ch\u1ECDn completed ch\u1EC9 khi m\u1EE5c ti\xEAu th\u1EF1c s\u1EF1 \u0111\u1EA1t \u0111\u01B0\u1EE3c; n\u1EBFu ch\u01B0a \u0111\u1EA1t th\xEC ch\u1ECDn failed/blocked/needs_user v\xE0 n\xEAu r\xF5 l\xFD do trong answer.`;
 var GeminiBrowserAgent = class {
   static {
     this.activeJobs = /* @__PURE__ */ new Map();
@@ -118146,6 +118169,7 @@ NGUY\xCAN T\u1EAEC H\xC0NH \u0110\u1ED8NG:
 `;
     const conversationContents = [];
     let lastToolFailed = false;
+    let formatNudgeUsed = false;
     const currentTab = browserState.getActiveTab();
     const initialDom = browserState.getDomSnapshot(currentTab.id);
     const initialPrompt = `M\u1EE5c ti\xEAu c\u1EE7a ng\u01B0\u1EDDi d\xF9ng: "${task}"
@@ -118187,6 +118211,19 @@ H\xE3y ph\xE2n t\xEDch m\u1EE5c ti\xEAu v\xE0 quy\u1EBFt \u0111\u1ECBnh c\xF4ng 
         const functionCalls = content?.parts?.filter((p) => p.functionCall);
         const thought = textPart?.text || "";
         if (!functionCalls || functionCalls.length === 0) {
+          if (!formatNudgeUsed && stepIndex < MAX_STEPS && !parseFinalProposal(thought)) {
+            formatNudgeUsed = true;
+            conversationContents.push({ role: "model", parts: content?.parts || [] });
+            conversationContents.push({ role: "user", parts: [{ text: FINAL_ANSWER_NUDGE }] });
+            const nudgeStep = {
+              stepNumber: stepIndex,
+              thought: "H\u1ED3i \u0111\xE1p cu\u1ED1i kh\xF4ng \u0111\xFAng \u0111\u1ECBnh d\u1EA1ng JSON \u2014 \u0111\xE3 y\xEAu c\u1EA7u tr\u1EA3 l\u1EA1i \u0111\xFAng format (m\u1ED9t l\u1EA7n duy nh\u1EA5t).",
+              timestamp: Date.now()
+            };
+            steps.push(nudgeStep);
+            onStep(nudgeStep);
+            continue;
+          }
           const tab2 = browserState.getActiveTab();
           const decision = validateFinalAnswer(tab2, browserState.getDomSnapshot(tab2.id), thought, lastToolFailed);
           const finalAnswer2 = decision.answer;

@@ -55,6 +55,21 @@ export function getMissingGeminiKeyMessage(env: NodeJS.ProcessEnv = process.env)
   return 'Chưa cấu hình GEMINI_API_KEY. Đặt biến môi trường GEMINI_API_KEY trong .env hoặc secrets của host (Render/Docker), rồi khởi động lại máy chủ.';
 }
 
+/** obmc-final-nudge-20261107 — parse the strict final-answer JSON; null means the model answered in prose (format slip, not task failure). */
+export function parseFinalProposal(text: string): { outcome?: string; answer?: string; evidence?: string } | null {
+  try {
+    const proposal = JSON.parse(text.replace(/^```(?:json)?\s*|\s*```$/g, ''));
+    if (proposal && typeof proposal === 'object' && !Array.isArray(proposal) &&
+      ['completed', 'blocked', 'needs_user', 'failed'].includes(proposal.outcome)) {
+      return proposal;
+    }
+  } catch { /* prose or malformed JSON */ }
+  return null;
+}
+
+/** One-shot reminder pushed back to the model when the final answer is not the required JSON (exported for tests). */
+export const FINAL_ANSWER_NUDGE = `Hồi đáp cuối chưa đúng định dạng. KHÔNG gọi công cụ. Trả lời lại NGAY BẰNG MỘT JSON thuần duy nhất theo đúng dạng: {"outcome":"completed|blocked|needs_user|failed","answer":"trả lời tiếng Việt","evidence":"trích nguyên văn ít nhất 8 ký tự từ DOM hiện tại"}. Chọn completed chỉ khi mục tiêu thực sự đạt được; nếu chưa đạt thì chọn failed/blocked/needs_user và nêu rõ lý do trong answer.`;
+
 export class GeminiBrowserAgent {
   private static activeJobs: Map<string, { abort: boolean }> = new Map();
 
@@ -308,6 +323,8 @@ NGUYÊN TẮC HÀNH ĐỘNG:
 
     const conversationContents: any[] = [];
     let lastToolFailed = false;
+    // obmc-final-nudge-20261107 — allow ONE format-retry before fail-closing on a prose final answer.
+    let formatNudgeUsed = false;
 
     const currentTab = browserState.getActiveTab();
     const initialDom = browserState.getDomSnapshot(currentTab.id);
@@ -357,6 +374,20 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
         const thought = textPart?.text || '';
 
         if (!functionCalls || functionCalls.length === 0) {
+          // Prose final = format slip, not task failure: nudge once for the required JSON instead of discarding a grounded answer.
+          if (!formatNudgeUsed && stepIndex < MAX_STEPS && !parseFinalProposal(thought)) {
+            formatNudgeUsed = true;
+            conversationContents.push({ role: 'model', parts: content?.parts || [] });
+            conversationContents.push({ role: 'user', parts: [{ text: FINAL_ANSWER_NUDGE }] });
+            const nudgeStep: AgentStep = {
+              stepNumber: stepIndex,
+              thought: 'Hồi đáp cuối không đúng định dạng JSON — đã yêu cầu trả lại đúng format (một lần duy nhất).',
+              timestamp: Date.now(),
+            };
+            steps.push(nudgeStep);
+            onStep(nudgeStep);
+            continue;
+          }
           const tab = browserState.getActiveTab();
           const decision = validateFinalAnswer(tab, browserState.getDomSnapshot(tab.id), thought, lastToolFailed);
           const finalAnswer = decision.answer;
