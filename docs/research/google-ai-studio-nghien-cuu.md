@@ -191,3 +191,14 @@ Channel **obmc-gateway** đã tạo trên 9Router của team (`192.168.1.125:201
 
 - Giao diện sống `aistudio.google.com` phiên `ceo@ngantin.vn`, 7/11/2026 (mọi mục ✅).
 - Link từ UI: [pricing](https://aistudio.google.com/docs/pricing#gemini-4-argon) · [model card 3.8 Flash](https://deepmind.google/models/model-cards/gemini-3-8-flash/) · [interactions API docs](https://aistudio.google.com/docs/interactions-overview).
+
+## Phụ lục 5: lane GEM cho dev team + bug /v1/messages của 9Router (tối 7/11/2026)
+
+**Lane GEM đã mở** (worker `~/.oz/oz-gem-worker.sh`, 2 luồng): agent gọi trực tiếp
+`POST http://192.168.1.125:20128/v1/chat/completions` (key 9Router `obmc-chain-test`, model `obmc/gemini-flash-lite-latest`).
+
+- Việc đầu tiên đã phân: **QA đầu ra trích điều của Gemma** (model local) — flash soi từng dòng JSON, trả cờ `SCHEMA/DIEU_SAI/VO_LY/TIENG_VIET/RONG`. Kết quả soir lỗi khớp kiểm máy: 39/986 dòng JSON hỏng thật bị bắt đúng, cờ `DIEU_SAI` cho mục Phụ lục là lệch format thật (cần nới schema).
+- Tốc độ đo thực: **1,1–4,1s/job** (flash-lite), 74 job xong trong ~2 phút.
+- Phân vai theo lệnh CEO (lane trình duyệt-Gemini → chọn đúng việc): flash nhận **việc text tiếng Việt** (QA, soi, tóm tắt, sinh từ khoá) — KHÔNG nhận code/agent cần tool.
+
+**Bug đã ghi nhận — đừng dẫm:** gọi `POST /v1/messages` (protocol Anthropic) trên 9Router `.125:20128` với model `obmc/*` → stream có `message_start` → `message_delta` (usage đếm đủ token) → `message_stop` nhưng **KHÔNG có sự kiện `content_block_*` nào** — nội dung bị nuốt hoàn toàn, kể cả request không có `tools`. OBMC chỉ triển khai `/v1/chat/completions` (server.ts:452); tầng chuyển Anthropic nằm ở 9Router → **Claude Code CLI chưa đấu được vào lane obmc-gateway** cho tới khi 9Router sửa. Đường tạm đúng: gọi thẳng `chat/completions` như lane GEM đang dùng.
