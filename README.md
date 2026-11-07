@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.17** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.18** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -19,6 +19,11 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.18 — human-assist: pause/resume with a Tiếp tục button (`obmc-human-assist-20261107`)
+
+- Research item #6, and the follow-up to the HS-code verdict: an agent hitting a human-only wall (login/QR/complex slider, or content gated behind a **trusted** click) now returns `needs_user` — and instead of ending, the job **pauses**: the UI shows an amber banner with exactly what the user must do and a **Tiếp tục** button (`POST /api/agent/resume`). On resume the loop continues with a fresh grounded observation, so the agent finishes the task with the data the human unlocked.
+- 240s wait budget per pause (fits Vercel maxDuration 300); Stop still aborts instantly; on timeout the original `needs_user` outcome is returned. `HUMAN_ASSIST_RULES` added to the Gemini prompt (also forbids using needs_user to dodge reading).
 
 ### v4.1.17 — expand v6: one click per toggle (`obmc-shadow-pierce-20261107`)
 

@@ -143,10 +143,12 @@ export interface AgentStep {
 
 export interface AgentState {
   isRunning: boolean;
-  status: 'idle' | 'running' | 'paused' | 'completed' | 'error';
+  /** obmc-human-assist-20261107 — waiting_user: agent paused for a human action in the pane (login QR, trusted click), resumes via /api/agent/resume. */
+  status: 'idle' | 'running' | 'paused' | 'waiting_user' | 'completed' | 'error';
   task: string;
   steps: AgentStep[];
   error?: string;
+  waitingReason?: string;
   currentStepIndex: number;
 }
 

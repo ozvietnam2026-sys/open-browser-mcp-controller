@@ -118214,6 +118214,12 @@ QUY T\u1EAEC T\xCCM KI\u1EBEM MADE-IN-CHINA (made-in-china.com):
 - N\u1EBFu trang hi\u1EC7n "The information you are looking for is not available currently": \u0111\xF3 l\xE0 trang kh\xF4ng c\xF3 k\u1EBFt qu\u1EA3 do URL sai, KH\xD4NG ph\u1EA3i t\u01B0\u1EDDng \u0111\u0103ng nh\u1EADp. Th\u1EED l\u1EA1i ngay m\u1ED9t trong hai d\u1EA1ng URL \u0111\xFAng \u1EDF tr\xEAn; kh\xF4ng b\u1EA3o ng\u01B0\u1EDDi d\xF9ng \u0111\u0103ng nh\u1EADp v\xE0 kh\xF4ng k\u1EBFt lu\u1EADn site kh\xF4ng c\xF3 nh\xE0 cung c\u1EA5p. "Sign In / Join Free" \u1EDF \u0111\u1EA7u trang ch\u1EC9 l\xE0 thanh menu.
 - V\u1EABn KH\xD4NG b\u1ECBa gi\xE1/MOQ; ch\u1EC9 b\xE1o nh\u1EEFng g\xEC hi\u1EC3n th\u1ECB sau khi trang k\u1EBFt qu\u1EA3 \u0111\xFAng \u0111\xE3 t\u1EA3i.
 `;
+var HUMAN_ASSIST_RULES = `
+QUY T\u1EAEC CH\u1EDC NG\u01AF\u1EDCI D\xD9NG CAN THI\u1EC6P (obmc-human-assist-20261107):
+- Khi g\u1EB7p: t\u01B0\u1EDDng \u0111\u0103ng nh\u1EADp / qu\xE9t QR / slider ph\u1EE9c t\u1EA1p, ho\u1EB7c n\u1ED9i dung ch\u1EC9 m\u1EDF b\u1EB1ng click th\u1EADt c\u1EE7a ng\u01B0\u1EDDi d\xF9ng (m\u1ED9t s\u1ED1 site ch\u1EC9 t\u1EA3i d\u1EEF li\u1EC7u khi s\u1EF1 ki\u1EC7n click l\xE0 trusted \u2014 click t\u1EF1 \u0111\u1ED9ng c\u1EE7a tool kh\xF4ng k\xEDch ho\u1EA1t \u0111\u01B0\u1EE3c), h\xE3y tr\u1EA3 JSON thu\u1EA7n {"outcome":"needs_user","answer":"n\xEAu r\xF5 NG\u01AF\u1EDCI D\xD9NG c\u1EA7n l\xE0m g\xEC tr\xEAn trang (\u0111\u0103ng nh\u1EADp/qu\xE9t QR/b\u1EA5m n\xFAt n\xE0o)","evidence":"tr\xEDch ch\u1EEF hi\u1EC7n t\u1EA1i"}.
+- H\u1EC7 th\u1ED1ng s\u1EBD T\u1EA0M D\u1EEANG t\xE1c v\u1EE5 v\xE0 hi\u1EC3n th\u1ECB n\xFAt "Ti\u1EBFp t\u1EE5c". Ng\u01B0\u1EDDi d\xF9ng t\u1EF1 thao t\xE1c tr\xEAn tr\xECnh duy\u1EC7t r\u1ED3i b\u1EA5m Ti\u1EBFp t\u1EE5c; sau \u0111\xF3 b\u1EA1n nh\u1EADn quan s\xE1t m\u1EDBi v\xE0 PH\u1EA2I ti\u1EBFp t\u1EE5c nhi\u1EC7m v\u1EE5 g\u1ED1c \u2014 n\u1EBFu d\u1EEF li\u1EC7u c\u1EA7n \u0111\xE3 hi\u1EC7n th\xEC tr\xEDch xu\u1EA5t v\xE0 tr\u1EA3 completed.
+- KH\xD4NG d\xF9ng needs_user \u0111\u1EC3 n\xE9 vi\u1EC7c \u0111\u1ECDc trang: ch\u1EC9 d\xF9ng khi th\u1EADt s\u1EF1 c\u1EA7n b\xE0n tay ng\u01B0\u1EDDi.
+`;
 function getMissingGeminiKeyMessage(env = process.env) {
   if (env.VERCEL) {
     return "Ch\u01B0a c\u1EA5u h\xECnh GEMINI_API_KEY. Tr\xEAn Vercel: Project Settings \u2192 Environment Variables, th\xEAm GEMINI_API_KEY cho Production/Preview, r\u1ED3i Redeploy.";
@@ -118242,10 +118248,20 @@ var GeminiBrowserAgent = class {
     const job = this.activeJobs.get(jobId);
     if (job) {
       job.abort = true;
+      job.waiting = false;
+      job.resume?.();
     }
   }
-  static async runAutonomousAgent(task, onStep, jobId = "job-" + Date.now()) {
-    const job = { abort: false };
+  /** Resume a job paused for human assist; returns false if not waiting. */
+  static resumeJob(jobId) {
+    const job = this.activeJobs.get(jobId);
+    if (!job || !job.waiting || !job.resume) return false;
+    job.waiting = false;
+    job.resume();
+    return true;
+  }
+  static async runAutonomousAgent(task, onStep, jobId = "job-" + Date.now(), onWaiting) {
+    const job = { abort: false, waiting: false, resume: void 0 };
     this.activeJobs.set(jobId, job);
     const steps = [];
     const AGENT_MODEL_CASCADE = [
@@ -118491,6 +118507,7 @@ QUAN TR\u1ECCNG \u2014 TRANG WEB TH\u1EACT:
 
 ${PRICE_GROUNDING_RULES}
 ${CAPTCHA_INTERACTION_RULES}
+${HUMAN_ASSIST_RULES}
 ${MIC_SEARCH_RULES}
 QUY T\u1EAEC QUAN S\xC1T HI\u1EC6N T\u1EA0I (obmc-challenge-detect-20261107):
 - Ch\u1EC9 d\xF9ng DOM thu\u1ED9c tabId + URL + navigationId hi\u1EC7n t\u1EA1i. B\u1ECF n\u1ED9i dung c\u1EE7a l\u1EA7n \u0111i\u1EC1u h\u01B0\u1EDBng tr\u01B0\u1EDBc.
@@ -118568,6 +118585,45 @@ H\xE3y ph\xE2n t\xEDch m\u1EE5c ti\xEAu v\xE0 quy\u1EBFt \u0111\u1ECBnh c\xF4ng 
           }
           const tab2 = browserState.getActiveTab();
           const decision = validateFinalAnswer(tab2, browserState.getDomSnapshot(tab2.id), thought, lastToolFailed);
+          if (decision.outcome === "needs_user" && stepIndex < MAX_STEPS && !job.abort) {
+            onWaiting?.({ reason: decision.answer.slice(0, 300) });
+            const waitStep = {
+              stepNumber: stepIndex,
+              thought: `\u23F8 Ch\u1EDD ng\u01B0\u1EDDi d\xF9ng can thi\u1EC7p \u2014 ${decision.answer.slice(0, 160)}`,
+              timestamp: Date.now()
+            };
+            steps.push(waitStep);
+            onStep(waitStep);
+            const resumed = await new Promise((resolveWait) => {
+              job.waiting = true;
+              const timer = setTimeout(() => {
+                job.waiting = false;
+                job.resume = void 0;
+                resolveWait(false);
+              }, 24e4);
+              job.resume = () => {
+                clearTimeout(timer);
+                job.resume = void 0;
+                resolveWait(true);
+              };
+            });
+            if (resumed && !job.abort) {
+              const freshTab = browserState.getActiveTab();
+              const freshDom = browserState.getDomSnapshot(freshTab.id);
+              conversationContents.push({ role: "model", parts: content?.parts || [] });
+              conversationContents.push({
+                role: "user",
+                parts: [{
+                  text: `[NG\u01AF\u1EDCI D\xD9NG \u0110\xC3 CAN THI\u1EC6P XONG V\xC0 B\u1EA4M TI\u1EBEP T\u1EE4C]
+Quan s\xE1t m\u1EDBi: ${JSON.stringify(classifyChallenge(freshTab, freshDom))}
+URL: ${freshTab.url}
+Ti\xEAu \u0111\u1EC1: ${freshTab.title}
+Ti\u1EBFp t\u1EE5c nhi\u1EC7m v\u1EE5 g\u1ED1c v\u1EDBi \u0111\xFAng quan s\xE1t n\xE0y. N\u1EBFu d\u1EEF li\u1EC7u c\u1EA7n \u0111\xE3 hi\u1EC3n th\u1ECB th\xEC tr\xEDch xu\u1EA5t v\xE0 tr\u1EA3 JSON completed k\xE8m evidence nguy\xEAn v\u0103n; n\u1EBFu v\u1EABn b\u1ECB ch\u1EB7n th\xEC tr\u1EA3 l\u1EA1i needs_user ho\u1EB7c failed trung th\u1EF1c.`
+                }]
+              });
+              continue;
+            }
+          }
           const finalAnswer2 = decision.answer;
           const step = {
             stepNumber: stepIndex,
@@ -118970,7 +119026,13 @@ data: ${JSON.stringify(step)}
 
 `);
       },
-      jobId
+      jobId,
+      (info) => {
+        res.write(`event: agent_waiting
+data: ${JSON.stringify({ jobId, reason: info.reason })}
+
+`);
+      }
     );
     clearInterval(ping);
     res.write(`event: agent_done
@@ -118989,6 +119051,11 @@ data: ${JSON.stringify({ error: err?.message || "Agent error" })}
     clearInterval(ping);
     res.end();
   }
+});
+app.post("/api/agent/resume", (req, res) => {
+  const { jobId } = req.body;
+  const resumed = jobId ? GeminiBrowserAgent.resumeJob(jobId) : false;
+  res.json({ success: resumed, jobId });
 });
 app.post("/api/agent/stop", (req, res) => {
   const { jobId } = req.body;

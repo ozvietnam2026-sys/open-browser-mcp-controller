@@ -45,6 +45,14 @@ QUY TẮC TÌM KIẾM MADE-IN-CHINA (made-in-china.com):
 - Vẫn KHÔNG bịa giá/MOQ; chỉ báo những gì hiển thị sau khi trang kết quả đúng đã tải.
 `;
 
+/** Human-assist rule (exported for tests): some walls and trusted-gated content need real user action. */
+export const HUMAN_ASSIST_RULES = `
+QUY TẮC CHỜ NGƯỜI DÙNG CAN THIỆP (obmc-human-assist-20261107):
+- Khi gặp: tường đăng nhập / quét QR / slider phức tạp, hoặc nội dung chỉ mở bằng click thật của người dùng (một số site chỉ tải dữ liệu khi sự kiện click là trusted — click tự động của tool không kích hoạt được), hãy trả JSON thuần {"outcome":"needs_user","answer":"nêu rõ NGƯỜI DÙNG cần làm gì trên trang (đăng nhập/quét QR/bấm nút nào)","evidence":"trích chữ hiện tại"}.
+- Hệ thống sẽ TẠM DỪNG tác vụ và hiển thị nút "Tiếp tục". Người dùng tự thao tác trên trình duyệt rồi bấm Tiếp tục; sau đó bạn nhận quan sát mới và PHẢI tiếp tục nhiệm vụ gốc — nếu dữ liệu cần đã hiện thì trích xuất và trả completed.
+- KHÔNG dùng needs_user để né việc đọc trang: chỉ dùng khi thật sự cần bàn tay người.
+`;
+
 export function getMissingGeminiKeyMessage(env: NodeJS.ProcessEnv = process.env): string {
   if (env.VERCEL) {
     return 'Chưa cấu hình GEMINI_API_KEY. Trên Vercel: Project Settings → Environment Variables, thêm GEMINI_API_KEY cho Production/Preview, rồi Redeploy.';
@@ -71,21 +79,33 @@ export function parseFinalProposal(text: string): { outcome?: string; answer?: s
 export const FINAL_ANSWER_NUDGE = `Hồi đáp cuối chưa đúng định dạng. KHÔNG gọi công cụ. Trả lời lại NGAY BẰNG MỘT JSON thuần duy nhất theo đúng dạng: {"outcome":"completed|blocked|needs_user|failed","answer":"trả lời tiếng Việt","evidence":"trích nguyên văn ít nhất 8 ký tự từ DOM hiện tại"}. Chọn completed chỉ khi mục tiêu thực sự đạt được; nếu chưa đạt thì chọn failed/blocked/needs_user và nêu rõ lý do trong answer.`;
 
 export class GeminiBrowserAgent {
-  private static activeJobs: Map<string, { abort: boolean }> = new Map();
+  private static activeJobs: Map<string, { abort: boolean; waiting: boolean; resume?: () => void }> = new Map();
 
   public static stopJob(jobId: string) {
     const job = this.activeJobs.get(jobId);
     if (job) {
       job.abort = true;
+      job.waiting = false;
+      job.resume?.(); // wake a paused loop so it exits immediately
     }
+  }
+
+  /** Resume a job paused for human assist; returns false if not waiting. */
+  public static resumeJob(jobId: string): boolean {
+    const job = this.activeJobs.get(jobId);
+    if (!job || !job.waiting || !job.resume) return false;
+    job.waiting = false;
+    job.resume();
+    return true;
   }
 
   public static async runAutonomousAgent(
     task: string,
     onStep: (step: AgentStep) => void,
-    jobId: string = 'job-' + Date.now()
+    jobId: string = 'job-' + Date.now(),
+    onWaiting?: (info: { reason: string }) => void
   ): Promise<{ success: boolean; outcome: AgentOutcome; answer: string; steps: AgentStep[] }> {
-    const job = { abort: false };
+    const job = { abort: false, waiting: false, resume: undefined as undefined | (() => void) };
     this.activeJobs.set(jobId, job);
 
     const steps: AgentStep[] = [];
@@ -340,6 +360,7 @@ QUAN TRỌNG — TRANG WEB THẬT:
 
 ${PRICE_GROUNDING_RULES}
 ${CAPTCHA_INTERACTION_RULES}
+${HUMAN_ASSIST_RULES}
 ${MIC_SEARCH_RULES}
 QUY TẮC QUAN SÁT HIỆN TẠI (obmc-challenge-detect-20261107):
 - Chỉ dùng DOM thuộc tabId + URL + navigationId hiện tại. Bỏ nội dung của lần điều hướng trước.
@@ -428,6 +449,49 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
           }
           const tab = browserState.getActiveTab();
           const decision = validateFinalAnswer(tab, browserState.getDomSnapshot(tab.id), thought, lastToolFailed);
+
+          // obmc-human-assist-20261107 — needs_user pauses the job instead of ending it:
+          // the user does the human-only action in the pane (login QR, trusted click), presses
+          // Tiếp tục, and the loop continues with a fresh grounded observation.
+          if (decision.outcome === 'needs_user' && stepIndex < MAX_STEPS && !job.abort) {
+            onWaiting?.({ reason: decision.answer.slice(0, 300) });
+            const waitStep: AgentStep = {
+              stepNumber: stepIndex,
+              thought: `⏸ Chờ người dùng can thiệp — ${decision.answer.slice(0, 160)}`,
+              timestamp: Date.now(),
+            };
+            steps.push(waitStep);
+            onStep(waitStep);
+
+            const resumed = await new Promise<boolean>((resolveWait) => {
+              job.waiting = true;
+              const timer = setTimeout(() => {
+                job.waiting = false;
+                job.resume = undefined;
+                resolveWait(false);
+              }, 240_000);
+              job.resume = () => {
+                clearTimeout(timer);
+                job.resume = undefined;
+                resolveWait(true);
+              };
+            });
+
+            if (resumed && !job.abort) {
+              const freshTab = browserState.getActiveTab();
+              const freshDom = browserState.getDomSnapshot(freshTab.id);
+              conversationContents.push({ role: 'model', parts: content?.parts || [] });
+              conversationContents.push({
+                role: 'user',
+                parts: [{
+                  text: `[NGƯỜI DÙNG ĐÃ CAN THIỆP XONG VÀ BẤM TIẾP TỤC]\nQuan sát mới: ${JSON.stringify(classifyChallenge(freshTab, freshDom))}\nURL: ${freshTab.url}\nTiêu đề: ${freshTab.title}\nTiếp tục nhiệm vụ gốc với đúng quan sát này. Nếu dữ liệu cần đã hiển thị thì trích xuất và trả JSON completed kèm evidence nguyên văn; nếu vẫn bị chặn thì trả lại needs_user hoặc failed trung thực.`,
+                }],
+              });
+              continue;
+            }
+            // timeout (240s) or aborted → return the needs_user decision as before
+          }
+
           const finalAnswer = decision.answer;
           const step: AgentStep = {
             stepNumber: stepIndex,

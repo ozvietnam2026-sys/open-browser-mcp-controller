@@ -116,6 +116,19 @@ export const AiAgentPanel: React.FC<AiAgentPanelProps> = ({ onClose, activeTabUr
           const eventType = eventMatch ? eventMatch[1].trim() : 'message';
           const rawData = dataMatch ? dataMatch[1].trim() : '';
 
+          // obmc-human-assist-20261107 — agent paused for a human action in the pane
+          if (eventType === 'agent_waiting' && rawData) {
+            try {
+              const waitObj = JSON.parse(rawData);
+              setAgentState((prev) => ({
+                ...prev,
+                isRunning: true,
+                status: 'waiting_user',
+                waitingReason: waitObj.reason || 'Agent cần bạn thao tác trên trang rồi bấm Tiếp tục',
+              }));
+            } catch (e) {}
+          }
+
           if (eventType === 'agent_step' && rawData) {
             try {
               const step: AgentStep = JSON.parse(rawData);
@@ -131,6 +144,7 @@ export const AiAgentPanel: React.FC<AiAgentPanelProps> = ({ onClose, activeTabUr
                   ...prev,
                   steps: newSteps,
                   currentStepIndex: step.stepNumber,
+                  status: prev.status === 'waiting_user' ? 'running' : prev.status,
                 };
               });
 
@@ -172,6 +186,16 @@ export const AiAgentPanel: React.FC<AiAgentPanelProps> = ({ onClose, activeTabUr
     } finally {
       setAgentState((prev) => ({ ...prev, isRunning: false }));
     }
+  };
+
+  const handleResumeTask = async () => {
+    if (!activeJobIdRef.current) return;
+    await fetch('/api/agent/resume', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId: activeJobIdRef.current }),
+    }).catch(() => {});
+    setAgentState((prev) => ({ ...prev, status: 'running', waitingReason: undefined }));
   };
 
   const handleStopTask = async () => {
@@ -374,6 +398,29 @@ export const AiAgentPanel: React.FC<AiAgentPanelProps> = ({ onClose, activeTabUr
           </div>
         )}
       </div>
+
+      {/* obmc-human-assist-20261107 — waiting-for-user banner + Continue */}
+      {agentState.status === 'waiting_user' && (
+        <div className="mx-3 mb-2 p-3 rounded-lg bg-amber-950/60 border border-amber-700/70">
+          <div className="flex items-start gap-2">
+            <span className="text-amber-400 text-lg leading-none">⏸</span>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-amber-300">Agent cần bạn can thiệp</div>
+              <div className="text-[11px] text-amber-200/90 mt-1 break-words">
+                {agentState.waitingReason || 'Thao tác trên trang (đăng nhập / quét QR / bấm nút cần click thật), rồi bấm Tiếp tục.'}
+              </div>
+              <button
+                onClick={handleResumeTask}
+                className="mt-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow"
+                title="Tôi đã xử lý xong — agent tiếp tục"
+              >
+                <Play className="w-3.5 h-3.5 fill-current" />
+                Tiếp tục (đã xử lý xong)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Task Input & Controls */}
       <div className="p-3 border-t border-slate-800 bg-slate-900/90">

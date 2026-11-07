@@ -392,7 +392,10 @@ app.post('/api/agent/run', async (req: Request, res: Response) => {
       (step) => {
         res.write(`event: agent_step\ndata: ${JSON.stringify(step)}\n\n`);
       },
-      jobId
+      jobId,
+      (info) => {
+        res.write(`event: agent_waiting\ndata: ${JSON.stringify({ jobId, reason: info.reason })}\n\n`);
+      }
     );
 
     clearInterval(ping);
@@ -406,6 +409,13 @@ app.post('/api/agent/run', async (req: Request, res: Response) => {
     clearInterval(ping);
     res.end();
   }
+});
+
+// obmc-human-assist-20261107 — resume a job paused because it needs a human action in the pane
+app.post('/api/agent/resume', (req: Request, res: Response) => {
+  const { jobId } = req.body;
+  const resumed = jobId ? GeminiBrowserAgent.resumeJob(jobId) : false;
+  res.json({ success: resumed, jobId });
 });
 
 app.post('/api/agent/stop', (req: Request, res: Response) => {
