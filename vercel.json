@@ -11,6 +11,7 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "/api/index.mjs" },
+    { "source": "/v1/(.*)", "destination": "/api/index.mjs" },
     { "source": "/mcp", "destination": "/api/index.mjs" },
     { "source": "/mcp/(.*)", "destination": "/api/index.mjs" },
     { "source": "/(.*)", "destination": "/index.html" }

@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.24** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.25** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -27,6 +27,12 @@ Vite + React UI + Express MCP server. Agents can:
 - The UI flow itself works end-to-end in a real browser (new_chat → type → Run → response slot appears), but the Google Workspace account used (`ceo@ngantin.vn`) gets **"Permission denied. Please check your account permissions and project settings"** — Gemini usage is not enabled for that account (also "No API key selected"). Fix belongs to the Workspace admin / API project setup, not the app.
 - Google AI Studio's SPA does not render through the Vercel proxy (auth-gated XHR; empty extract) — UI automation of Google properties needs a real browser session.
 - The token API (`POST /api/prompt/run`) sidesteps both problems: measured **1.2–2.1s server-side (1.8–2.7s end-to-end)** for a short prompt, with the model cascade visible (gemini-3.5-flash → gemini-flash-lite-latest on rate-limit).
+
+### v4.1.25 — QA gateway: persisted Q&A + OpenAI-compatible endpoint (`obmc-qa-gateway-20261107`)
+
+- `POST /api/qa/ask` (Bearer MCP token) — ask, persist, return the record `{id, question, answer, model, timingMs, createdAt, source, config}`. `GET /api/qa/list` / `GET /api/qa/:id` let other agents read saved Q&A. Storage rides the existing PersistStore (memory → file → Upstash Redis when configured).
+- **OpenAI wire format** for routers: `POST /v1/chat/completions` + `GET /v1/models` (vercel rewrite added for `/v1/*`). Add OBMC as a channel in any router (9router/OneAPI/uni-api): base URL `…/v1`, key = MCP token, model = e.g. `gemini-3.8-flash`.
+- Multi-turn messages map: system → system_instructions, history → labeled context, last user message → the live question.
 
 ### v4.1.24 — `/api/prompt/run` speaks AI Studio's Get-code params (`obmc-prompt-api-20261107`)
 

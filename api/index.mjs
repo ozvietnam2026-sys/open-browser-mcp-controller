@@ -118856,6 +118856,103 @@ async function runPrompt(prompt, opts = {}) {
 }
 
 // server.ts
+init_persist_store();
+
+// server/qa-gateway.ts
+init_persist_store();
+var INDEX_KEY = "qa:index";
+var MAX_RECORDS = 200;
+function qaStore() {
+  return getPersistStore({ namespace: "obmc-qa" });
+}
+async function saveQaRecord(input) {
+  const store3 = qaStore();
+  const record = {
+    ...input,
+    id: "qa-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7),
+    createdAt: (/* @__PURE__ */ new Date()).toISOString()
+  };
+  await store3.setJson("qa:" + record.id, record);
+  const index2 = await store3.getJson(INDEX_KEY) || [];
+  index2.unshift(record.id);
+  await store3.setJson(INDEX_KEY, index2.slice(0, MAX_RECORDS));
+  return record;
+}
+async function listQa(limit = 20) {
+  const store3 = qaStore();
+  const index2 = await store3.getJson(INDEX_KEY) || [];
+  const out = [];
+  for (const id of index2.slice(0, Math.max(1, Math.min(limit, MAX_RECORDS)))) {
+    const rec = await store3.getJson("qa:" + id);
+    if (rec) out.push(rec);
+  }
+  return out;
+}
+async function getQa(id) {
+  return qaStore().getJson("qa:" + id);
+}
+async function askAndSave(question, opts = {}) {
+  const result = await runPrompt(question, {
+    model: opts.model,
+    options: opts.options
+  });
+  if (result.error || !result.text) return { record: null, result };
+  const record = await saveQaRecord({
+    question,
+    answer: result.text,
+    model: result.model,
+    timingMs: result.timingMs,
+    source: opts.source || "api",
+    config: result.config
+  });
+  return { record, result };
+}
+function mapOpenAiRequest(body) {
+  const messages2 = Array.isArray(body?.messages) ? body.messages : [];
+  const systemParts = [];
+  const convo = [];
+  let lastRaw = "";
+  for (const m2 of messages2) {
+    const content = typeof m2?.content === "string" ? m2.content.trim() : "";
+    if (!content) continue;
+    if (m2.role === "system" || m2.role === "developer") systemParts.push(content);
+    else if (m2.role === "assistant") convo.push("Tr\u1EE3 l\xFD: " + content);
+    else {
+      convo.push("Ng\u01B0\u1EDDi d\xF9ng: " + content);
+      lastRaw = content;
+    }
+  }
+  let prompt = "";
+  if (convo.length > 1) prompt = convo.slice(0, -1).join("\n") + "\n\nC\xE2u h\u1ECFi hi\u1EC7n t\u1EA1i: " + convo[convo.length - 1];
+  else prompt = lastRaw;
+  return { prompt, model: typeof body?.model === "string" ? body.model : void 0, systemInstructions: systemParts.length ? systemParts.join("\n") : void 0 };
+}
+function toOpenAiResponse(record) {
+  return {
+    id: "chatcmpl-" + record.id,
+    object: "chat.completion",
+    created: Math.floor(new Date(record.createdAt).getTime() / 1e3),
+    model: record.model,
+    choices: [
+      {
+        index: 0,
+        message: { role: "assistant", content: record.answer },
+        finish_reason: "stop"
+      }
+    ],
+    usage: {
+      prompt_tokens: Math.ceil(record.question.length / 4),
+      completion_tokens: Math.ceil(record.answer.length / 4),
+      total_tokens: Math.ceil((record.question.length + record.answer.length) / 4)
+    }
+  };
+}
+function openAiModelsList(env = process.env) {
+  const data2 = promptModelCascade(env).map((id) => ({ id, object: "model", owned_by: "obmc" }));
+  return { object: "list", data: data2 };
+}
+
+// server.ts
 import_dotenv.default.config();
 var __filename2 = fileURLToPath(import.meta.url);
 var __dirname = path4.dirname(__filename2);
@@ -119196,6 +119293,40 @@ app.post("/api/prompt/run", requireMcpAuth, async (req, res) => {
   const result = await runPrompt(prompt, { model, options });
   if (result.error) return res.status(502).json(result);
   res.json(result);
+});
+app.post("/api/qa/ask", requireMcpAuth, async (req, res) => {
+  const { question, model, source, options } = req.body || {};
+  if (typeof question !== "string" || !question.trim() || question.length > 8e3) {
+    return res.status(400).json({ error: "Thi\u1EBFu question (chu\u1ED7i 1-8000 k\xFD t\u1EF1)" });
+  }
+  const { record, result } = await askAndSave(question.trim(), { model, source, options });
+  if (!record) return res.status(502).json({ error: result.error || "Kh\xF4ng t\u1EA1o \u0111\u01B0\u1EE3c c\xE2u tr\u1EA3 l\u1EDDi" });
+  res.json(record);
+});
+app.get("/api/qa/list", requireMcpAuth, async (req, res) => {
+  const limit = Number.parseInt(String(req.query.limit || "20"), 10) || 20;
+  res.json({ items: await listQa(limit), backend: getPersistStore().backend });
+});
+app.get("/api/qa/:id", requireMcpAuth, async (req, res) => {
+  const record = await getQa(String(req.params.id));
+  if (!record) return res.status(404).json({ error: "Kh\xF4ng t\xECm th\u1EA5y b\u1EA3n ghi" });
+  res.json(record);
+});
+app.post("/v1/chat/completions", requireMcpAuth, async (req, res) => {
+  const { prompt, model, systemInstructions } = mapOpenAiRequest(req.body);
+  if (!prompt) return res.status(400).json({ error: { message: "messages tr\u1ED1ng ho\u1EB7c kh\xF4ng h\u1EE3p l\u1EC7", type: "invalid_request_error" } });
+  const { record, result } = await askAndSave(prompt, {
+    model,
+    source: "openai-compat",
+    options: systemInstructions ? { systemInstructions } : void 0
+  });
+  if (!record) {
+    return res.status(502).json({ error: { message: result.error || "upstream error", type: "upstream_error" } });
+  }
+  res.json(toOpenAiResponse(record));
+});
+app.get("/v1/models", requireMcpAuth, (_req, res) => {
+  res.json(openAiModelsList());
 });
 app.post("/api/agent/resume", (req, res) => {
   const { jobId } = req.body;

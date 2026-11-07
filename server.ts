@@ -21,6 +21,8 @@ import { GeminiBrowserAgent } from './server/gemini-agent.js';
 
 import { requireMcpAuth } from './server/mcp-auth.js';
 import { runPrompt, validatePromptRunRequest } from './server/prompt-api.js';
+import { getPersistStore } from './server/infra/persist-store.js';
+import { askAndSave, listQa, getQa, mapOpenAiRequest, toOpenAiResponse, openAiModelsList } from './server/qa-gateway.js';
 
 dotenv.config();
 
@@ -422,6 +424,47 @@ app.post('/api/prompt/run', requireMcpAuth, async (req: Request, res: Response) 
   const result = await runPrompt(prompt, { model, options });
   if (result.error) return res.status(502).json(result);
   res.json(result);
+});
+
+// obmc-qa-gateway-20261107 — Q&A with persistence, served to other agents
+app.post('/api/qa/ask', requireMcpAuth, async (req: Request, res: Response) => {
+  const { question, model, source, options } = req.body || {};
+  if (typeof question !== 'string' || !question.trim() || question.length > 8000) {
+    return res.status(400).json({ error: 'Thiếu question (chuỗi 1-8000 ký tự)' });
+  }
+  const { record, result } = await askAndSave(question.trim(), { model, source, options });
+  if (!record) return res.status(502).json({ error: result.error || 'Không tạo được câu trả lời' });
+  res.json(record);
+});
+
+app.get('/api/qa/list', requireMcpAuth, async (req: Request, res: Response) => {
+  const limit = Number.parseInt(String(req.query.limit || '20'), 10) || 20;
+  res.json({ items: await listQa(limit), backend: getPersistStore().backend });
+});
+
+app.get('/api/qa/:id', requireMcpAuth, async (req: Request, res: Response) => {
+  const record = await getQa(String(req.params.id));
+  if (!record) return res.status(404).json({ error: 'Không tìm thấy bản ghi' });
+  res.json(record);
+});
+
+// OpenAI-compatible wire format — plug into any router (9router/OneAPI/uni-api) as a channel
+app.post('/v1/chat/completions', requireMcpAuth, async (req: Request, res: Response) => {
+  const { prompt, model, systemInstructions } = mapOpenAiRequest(req.body);
+  if (!prompt) return res.status(400).json({ error: { message: 'messages trống hoặc không hợp lệ', type: 'invalid_request_error' } });
+  const { record, result } = await askAndSave(prompt, {
+    model,
+    source: 'openai-compat',
+    options: systemInstructions ? { systemInstructions } : undefined,
+  });
+  if (!record) {
+    return res.status(502).json({ error: { message: result.error || 'upstream error', type: 'upstream_error' } });
+  }
+  res.json(toOpenAiResponse(record));
+});
+
+app.get('/v1/models', requireMcpAuth, (_req: Request, res: Response) => {
+  res.json(openAiModelsList());
 });
 
 // obmc-human-assist-20261107 — resume a job paused because it needs a human action in the pane
