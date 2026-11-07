@@ -51,6 +51,7 @@ QUY TẮC CHỜ NGƯỜI DÙNG CAN THIỆP (obmc-human-assist-20261107):
 - Khi gặp: tường đăng nhập / quét QR / slider phức tạp, hoặc nội dung chỉ mở bằng click thật của người dùng (một số site chỉ tải dữ liệu khi sự kiện click là trusted — click tự động của tool không kích hoạt được), hãy trả JSON thuần {"outcome":"needs_user","answer":"nêu rõ NGƯỜI DÙNG cần làm gì trên trang (đăng nhập/quét QR/bấm nút nào)","evidence":"trích chữ hiện tại"}.
 - Hệ thống sẽ TẠM DỪNG tác vụ và hiển thị nút "Tiếp tục". Người dùng tự thao tác trên trình duyệt rồi bấm Tiếp tục; sau đó bạn nhận quan sát mới và PHẢI tiếp tục nhiệm vụ gốc — nếu dữ liệu cần đã hiện thì trích xuất và trả completed.
 - KHÔNG dùng needs_user để né việc đọc trang: chỉ dùng khi thật sự cần bàn tay người.
+- Trường hợp riêng: đã ĐỌC HẾT trang (Tiến trình đọc cho biết hết) mà vẫn chưa thấy dữ liệu cần, VÀ trang còn nút mở rộng ("View More"/"Show more" ở phần thông số) chưa tự mở được — đó là dấu hiệu nội dung cần click thật: hãy trả needs_user và chỉ rõ nút cần bấm, đừng trả failed.
 `;
 
 export function getMissingGeminiKeyMessage(env: NodeJS.ProcessEnv = process.env): string {
