@@ -13,6 +13,18 @@ import { AgentStep } from '../shared/browser-types.js';
  * Environment-aware copy when GEMINI_API_KEY is missing.
  * Never includes a real key value.
  */
+/** Interactive-challenge guidance (exported for tests). */
+export const CAPTCHA_INTERACTION_RULES = `
+QUY TẮC THỬ THÁCH TƯƠNG TÁC (captcha kéo thả / câu đố đơn giản) — hoàn tất như người dùng thao tác trên trang:
+- Slider / swipe: xem ảnh chụp hoặc viewport hiện tại (browser_get_dom / screenshot), xác định tay nắm và rãnh/đích, rồi gọi browser_drag từ tâm tay nắm tới đích. Với ghép mảnh (jigsaw): kéo theo trục X đúng bằng khoảng lệch nhìn thấy của chỗ trống.
+- Câu đố đơn giản (simple puzzle): đọc câu hỏi (phép tính, "chọn tất cả đèn giao thông", chọn ảnh khớp, "con vật nào") rồi trả lời bằng browser_click / browser_type / browser_drag.
+- Nếu widget rung/lắc hoặc tự reset: thử lại ĐÚNG MỘT lần với khoảng cách điều chỉnh.
+- Không dùng dịch vụ giải captcha bên ngoài, không lấy token, không khai thác lỗ hổng.
+- Trong lúc captcha còn hiển thị: KHÔNG bịa giá hay bất kỳ dữ liệu trích xuất nào.
+- Chỉ báo thành công khi tường xác minh đã biến mất (đọc lại trang để kiểm tra).
+- Tường đăng nhập bằng QR / quét ứng dụng điện thoại (ví dụ Taobao "亲，请登录", "Please try again") không thể hoàn tất bằng kéo thả: dừng lại và báo người dùng cần đăng nhập hoặc tự vượt xác minh (theo QUY TẮC GIÁ).
+`;
+
 /** Anti-hallucination rule for price/supplier tasks (exported for tests). */
 export const PRICE_GROUNDING_RULES = `
 QUY TẮC GIÁ — CHỈ DÙNG DỮ LIỆU THẬT TRÊN TRANG (BẮT BUỘC):
@@ -137,6 +149,23 @@ const MAX_STEPS = 14;
         },
       },
       {
+        name: 'browser_drag',
+        description:
+          'Kéo thả bằng chuỗi pointer/mouse event nhiều bước (dùng cho slider, kéo mảnh ghép, kéo thả). Tọa độ pixel viewport: (x,y) điểm bắt đầu (tay nắm), (toX,toY) điểm kết thúc. Hoặc dùng fromRef/toRef.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            x: { type: Type.NUMBER, description: 'X bắt đầu' },
+            y: { type: Type.NUMBER, description: 'Y bắt đầu' },
+            toX: { type: Type.NUMBER, description: 'X kết thúc' },
+            toY: { type: Type.NUMBER, description: 'Y kết thúc (mặc định = y)' },
+            fromRef: { type: Type.STRING, description: 'Ref phần tử bắt đầu' },
+            toRef: { type: Type.STRING, description: 'Ref phần tử đích' },
+            steps: { type: Type.NUMBER, description: 'Số bước (mặc định 25)' },
+          },
+        },
+      },
+      {
         name: 'browser_hover',
         description: 'Di chuột tới phần tử để kích hoạt menu con hoặc hover state',
         parameters: {
@@ -251,6 +280,7 @@ QUAN TRỌNG — TRANG WEB THẬT:
 - Chỉ mở trang mẫu browser:// khi người dùng nêu rõ tên trang demo, hoặc khi tab hiện tại vốn đã là trang mẫu và nhiệm vụ thuộc về trang đó.
 
 ${PRICE_GROUNDING_RULES}
+${CAPTCHA_INTERACTION_RULES}
 NGUYÊN TẮC HÀNH ĐỘNG:
 - Sau mỗi thao tác quan trọng (navigate, click, type), hãy quan sát trạng thái mới.
 - Để click hoặc gõ phím, hãy sử dụng mã tham chiếu ref (ví dụ: "@ref:1", "@ref:2"...) được cung cấp từ browser_get_dom hoặc quan sát.

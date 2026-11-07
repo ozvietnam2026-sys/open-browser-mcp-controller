@@ -90,11 +90,11 @@ export function getConfig(): AppConfig {
   const caps = runtimeCapsOverride || envCaps || profileCaps;
 
   return {
-    version: '4.1.5',
+    version: '4.1.6',
     userAgent:
       process.env.OBMC_USER_AGENT ||
       process.env.AGENT_BROWSER_USER_AGENT ||
-      'OpenBrowserMCP/4.1.5 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller; research bot)',
+      'OpenBrowserMCP/4.1.6 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller; research bot)',
     proxyUrl: process.env.OBMC_PROXY || process.env.AGENT_BROWSER_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || undefined,
     proxyBypass: parseList(process.env.OBMC_PROXY_BYPASS || process.env.AGENT_BROWSER_PROXY_BYPASS || process.env.NO_PROXY),
     allowedDomains: parseList(process.env.OBMC_ALLOWED_DOMAINS || process.env.AGENT_BROWSER_ALLOWED_DOMAINS),
@@ -136,7 +136,7 @@ export function capForTool(name: string): ToolCap {
     if (['pw_network', 'pw_network_request', 'pw_route', 'pw_unroute', 'pw_route_list'].includes(name)) return 'network';
     if (['pw_cookies', 'pw_storage_state', 'pw_set_storage_state', 'pw_localstorage'].includes(name)) return 'storage';
     if (['pw_trace_start', 'pw_trace_stop', 'pw_highlight', 'pw_performance'].includes(name)) return 'devtools';
-    if (['pw_mouse_click_xy', 'pw_mouse_move_xy'].includes(name)) return 'vision';
+    if (['pw_mouse_click_xy', 'pw_mouse_move_xy', 'pw_mouse_drag_xy'].includes(name)) return 'vision';
     return 'playwright';
   }
   if (name.startsWith('mail_')) return 'mail';

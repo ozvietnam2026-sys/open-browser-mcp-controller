@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { buildDragPath } from '../../shared/drag-path';
 import { BuiltInPages } from './BuiltInPages';
 import {
   InteractiveElement,
@@ -419,6 +420,103 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
             }),
           }).catch(() => {});
         }
+      }
+
+      if (cmd.type === 'drag') {
+        const report = (success: boolean, data?: any, error?: string) =>
+          fetch('/api/browser/command-result', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ commandId: cmd.id, success, data, error }),
+          }).catch(() => {});
+        const find = (ref?: string, sel?: string): HTMLElement | null => {
+          if (ref) {
+            const el = targetContainer.querySelector(`[data-mcp-ref="${ref.replace('@ref:', '')}"]`);
+            if (el) return el as HTMLElement;
+          }
+          if (sel) {
+            try { return targetContainer.querySelector(sel) as HTMLElement | null; } catch { return null; }
+          }
+          return null;
+        };
+        const center = (el: HTMLElement) => {
+          const r = el.getBoundingClientRect();
+          return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+        };
+        const p = cmd.params || {};
+        const fromEl = find(p.fromRef, p.fromSelector);
+        const start = fromEl
+          ? center(fromEl)
+          : typeof p.x === 'number' && typeof p.y === 'number' ? { x: p.x, y: p.y } : null;
+        const toEl = find(p.toRef, p.toSelector);
+        const end = toEl
+          ? center(toEl)
+          : typeof p.toX === 'number' ? { x: p.toX, y: typeof p.toY === 'number' ? p.toY : start?.y ?? 0 } : null;
+        if (!start || !end) {
+          report(false, undefined, 'Thiếu điểm đầu/điểm cuối để kéo');
+          return;
+        }
+        // Resolve the element under a viewport point; descend into same-origin iframes.
+        const hit = (pt: { x: number; y: number }) => {
+          let doc: Document = document;
+          let x = pt.x, y = pt.y;
+          let view: Window = window;
+          let el = doc.elementFromPoint(x, y) as HTMLElement | null;
+          for (let depth = 0; el && el.tagName === 'IFRAME' && depth < 3; depth++) {
+            const fr = el as HTMLIFrameElement;
+            let inner: Document | null = null;
+            try { inner = fr.contentDocument; } catch { inner = null; }
+            if (!inner || !fr.contentWindow) break; // cross-origin: cannot reach
+            const r = fr.getBoundingClientRect();
+            x -= r.left; y -= r.top; doc = inner; view = fr.contentWindow;
+            el = doc.elementFromPoint(x, y) as HTMLElement | null;
+          }
+          return { el, x, y, view };
+        };
+        const first = fromEl ? { el: fromEl, x: start.x, y: start.y, view: window } : hit(start);
+        const target = first.el;
+        if (!target) {
+          report(false, undefined, `Không có phần tử tại (${start.x}, ${start.y})`);
+          return;
+        }
+        const pts = buildDragPath(start, end, p.steps ?? 25);
+        const offX = first.x - start.x, offY = first.y - start.y;
+        const fire = (el: Element, type: string, pt: { x: number; y: number }, buttons: number) => {
+          const init: any = {
+            bubbles: true, cancelable: true, composed: true, view: first.view,
+            clientX: pt.x + offX, clientY: pt.y + offY, screenX: pt.x, screenY: pt.y,
+            button: 0, buttons, pointerId: 1, pointerType: 'mouse', isPrimary: true, pressure: buttons ? 0.5 : 0,
+          };
+          const PE = (first.view as any).PointerEvent || (window as any).PointerEvent;
+          const ME = (first.view as any).MouseEvent || MouseEvent;
+          if (type.startsWith('pointer') && PE) el.dispatchEvent(new PE(type, init));
+          else if (!type.startsWith('pointer')) el.dispatchEvent(new ME(type, init));
+        };
+        const contRect = targetContainer.getBoundingClientRect();
+        const showCursor = (pt: { x: number; y: number }) =>
+          setCursorPos({ x: Math.round(pt.x - contRect.left), y: Math.round(pt.y - contRect.top), visible: true, label: 'Drag' });
+        showCursor(start);
+        fire(target, 'pointerover', start, 0);
+        fire(target, 'mouseover', start, 0);
+        fire(target, 'pointerdown', start, 1);
+        fire(target, 'mousedown', start, 1);
+        let i = 1;
+        const tick = () => {
+          if (i < pts.length) {
+            const pt = pts[i++];
+            showCursor(pt);
+            // move events go to the pressed element and bubble to the doc, like captured pointer
+            fire(target, 'pointermove', pt, 1);
+            fire(target, 'mousemove', pt, 1);
+            setTimeout(tick, 12 + Math.round(Math.random() * 10));
+            return;
+          }
+          fire(target, 'pointerup', end, 0);
+          fire(target, 'mouseup', end, 0);
+          scanBuiltInElements();
+          report(true, { from: start, to: end, steps: pts.length, element: target.tagName.toLowerCase() });
+        };
+        setTimeout(tick, 30);
       }
 
       if (cmd.type === 'hover') {

@@ -1,4 +1,4 @@
-# Feature Matrix — Open Browser MCP Controller v4.1.5
+# Feature Matrix — Open Browser MCP Controller v4.1.6
 
 Inventory of advanced / lesser-known features researched from public sources and adoption status.
 Ideas are **reimplemented** (not copied) under compatible licenses; paid SaaS APIs are not required.
@@ -145,3 +145,11 @@ Legend: **adopted** = in repo · **planned** = backlog · **N/A** = not applicab
 | render.yaml Blueprint | Render | **Done** |
 | agent-desktop dual MCP docs | vercel-labs/agent-desktop | **Done** (docs/config; OS a11y N/A on cloud) |
 | Lighthouse / full video pipeline | chrome-devtools | **Deferred** |
+
+## Interactive challenges (v4.1.6)
+
+| Feature | Status | Notes |
+|---|---|---|
+| `browser_drag` (in-app proxy) | ✅ | Stepped pointer/mouse event sequence (down → moves → up) by viewport coords or ref/selector; same-origin iframes only. |
+| `pw_mouse_drag_xy` (Playwright) | ✅ | Real `page.mouse.down/move/up` with stepped moves. |
+| Agent guidance | ✅ | Complete interactive challenges shown to the user (slider, simple puzzles); QR/app-login walls are reported to the user, never filled with invented data. No third-party solving services. |

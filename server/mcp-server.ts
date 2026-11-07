@@ -392,7 +392,7 @@ export class McpServerHandler {
                 type: 'text',
                 text: `Trang: "${snapshot.title}"\nURL: ${snapshot.url}\n\nCác phần tử tương tác (@ref) trên trang:\n${
                   elementsList || '(Không có phần tử tương tác)'
-                }\n\n* Bạn có thể gọi tool "browser_click", "browser_type", "browser_hover" bằng cách truyền tham số ref (ví dụ: ref: "@ref:1" hoặc "1").`,
+                }\n\n* Bạn có thể gọi tool "browser_click", "browser_type", "browser_hover", "browser_drag" bằng cách truyền tham số ref (ví dụ: ref: "@ref:1" hoặc "1").`,
               },
             ],
           };
@@ -452,6 +452,37 @@ export class McpServerHandler {
                     result.data?.elementDesc ? `[Phần tử: ${result.data.elementDesc}]` : ''
                   }`
                 : `❌ Lỗi khi click: ${result.error || 'Phần tử không tìm thấy hoặc bị ẩn'}`,
+            },
+          ],
+        };
+      }
+
+      case 'browser_drag': {
+        const { x, y, toX, toY, fromRef, fromSelector, toRef, toSelector, steps = 25, tabId } = args;
+        const targetTab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
+        const norm = (r?: string) => (r ? (r.startsWith('@ref:') ? r : `@ref:${r}`) : undefined);
+        const hasFrom = (x !== undefined && y !== undefined) || fromRef || fromSelector;
+        const hasTo = toX !== undefined || toY !== undefined || toRef || toSelector;
+        if (!hasFrom || !hasTo) {
+          throw new Error('browser_drag cần điểm đầu (x,y | fromRef | fromSelector) và điểm cuối (toX,toY | toRef | toSelector)');
+        }
+        browserState.emitVisualAction({ type: 'click', x, y, timestamp: Date.now() });
+        const result = await browserState.dispatchCommand(
+          'drag',
+          {
+            x, y, toX, toY: toY ?? y,
+            fromRef: norm(fromRef), fromSelector, toRef: norm(toRef), toSelector,
+            steps: Math.max(2, Number(steps) || 25),
+          },
+          targetTab?.id
+        );
+        return {
+          content: [
+            {
+              type: 'text',
+              text: result.success
+                ? `✅ Đã kéo từ (${result.data?.from?.x}, ${result.data?.from?.y}) tới (${result.data?.to?.x}, ${result.data?.to?.y}) qua ${result.data?.steps} bước. Hãy chụp/đọc lại trang để xác nhận thử thách đã biến mất.`
+                : `❌ Lỗi khi kéo: ${result.error || 'Không tìm thấy điểm bắt đầu'}`,
             },
           ],
         };

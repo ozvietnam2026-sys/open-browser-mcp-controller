@@ -127,6 +127,26 @@ export const MCP_BROWSER_TOOLS: McpToolDefinition[] = [
     },
   },
   {
+    name: 'browser_drag',
+    description:
+      'Kéo thả (drag) bằng chuỗi sự kiện pointer/mouse thật (pointerdown/mousedown → nhiều bước pointermove/mousemove → pointerup/mouseup, buttons:1). Dùng cho thanh trượt (slider), kéo mảnh ghép, kéo thả trong giao diện và các thử thách tương tác hiển thị cho người dùng. Tọa độ là pixel viewport (giống browser_click). Có thể dùng ref/selector cho điểm đầu (from) và điểm cuối (to). Giới hạn: chỉ tới được iframe cùng origin; widget trong iframe khác origin không nhận được sự kiện — khi đó hãy báo người dùng tự hoàn tất.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        x: { type: 'number', description: 'X bắt đầu (pixel viewport), ví dụ tâm tay nắm slider.' },
+        y: { type: 'number', description: 'Y bắt đầu (pixel viewport).' },
+        toX: { type: 'number', description: 'X kết thúc.' },
+        toY: { type: 'number', description: 'Y kết thúc (mặc định = y cho slider ngang).' },
+        fromRef: { type: 'string', description: 'Ref phần tử bắt đầu (thay cho x,y).' },
+        fromSelector: { type: 'string', description: 'CSS selector phần tử bắt đầu.' },
+        toRef: { type: 'string', description: 'Ref phần tử đích (thay cho toX,toY).' },
+        toSelector: { type: 'string', description: 'CSS selector phần tử đích.' },
+        steps: { type: 'number', description: 'Số bước di chuyển (mặc định 25, tối thiểu 2).' },
+        tabId: { type: 'string', description: 'ID tab (tùy chọn).' },
+      },
+    },
+  },
+  {
     name: 'browser_hover',
     description:
       'Di chuột (hover) vào một phần tử hoặc tọa độ trên trang để kích hoạt hiệu ứng hiển thị menu con, flyout dropdown hoặc tooltip.',

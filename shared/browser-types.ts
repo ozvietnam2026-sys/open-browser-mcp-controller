@@ -62,6 +62,7 @@ export interface BrowserCommand {
     | 'click'
     | 'type'
     | 'hover'
+    | 'drag'
     | 'press_key'
     | 'select_option'
     | 'wait_for'
@@ -136,7 +137,7 @@ export interface AgentState {
 }
 
 export interface VisualActionIndicator {
-  type: 'mouse' | 'click' | 'type' | 'hover' | 'scroll' | 'screenshot' | 'key';
+  type: 'mouse' | 'click' | 'type' | 'hover' | 'drag' | 'scroll' | 'screenshot' | 'key';
   x?: number;
   y?: number;
   text?: string;

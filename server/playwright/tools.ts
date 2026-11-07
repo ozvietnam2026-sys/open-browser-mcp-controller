@@ -45,6 +45,7 @@ import {
   waitForDownload,
   mouseClickXY,
   mouseMoveXY,
+  mouseDragXY,
   selectOption,
   fillForm,
   dragDrop,
@@ -496,6 +497,20 @@ export const MCP_PLAYWRIGHT_TOOLS: McpToolDefinition[] = [
       type: 'object',
       properties: { x: { type: 'number' }, y: { type: 'number' } },
       required: ['x', 'y'],
+    },
+  },
+  {
+    name: 'pw_mouse_drag_xy',
+    description:
+      'Drag with the real mouse from (fromX,fromY) to (toX,toY) in viewport pixels: mouse.down, stepped mouse.move, mouse.up. For sliders, drag-and-drop UI, and interactive challenges shown to the user. Use pw_drag for element-to-element.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        fromX: { type: 'number' }, fromY: { type: 'number' },
+        toX: { type: 'number' }, toY: { type: 'number' },
+        steps: { type: 'number', description: 'Intermediate moves (default 25).' },
+      },
+      required: ['fromX', 'fromY', 'toX', 'toY'],
     },
   },
   {
@@ -955,6 +970,14 @@ export async function executePlaywrightTool(name: string, args: Record<string, a
         return textResult(JSON.stringify(await mouseClickXY(Number(args.x), Number(args.y)), null, 2));
       case 'pw_mouse_move_xy':
         return textResult(JSON.stringify(await mouseMoveXY(Number(args.x), Number(args.y)), null, 2));
+      case 'pw_mouse_drag_xy':
+        return textResult(
+          JSON.stringify(
+            await mouseDragXY(Number(args.fromX), Number(args.fromY), Number(args.toX), Number(args.toY), args.steps !== undefined ? Number(args.steps) : 25),
+            null,
+            2
+          )
+        );
       case 'pw_highlight':
         return textResult(JSON.stringify(await highlightRef(args.ref), null, 2));
       case 'pw_trace_start': {

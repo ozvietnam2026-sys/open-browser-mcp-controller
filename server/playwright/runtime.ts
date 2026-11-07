@@ -1,3 +1,4 @@
+import { buildDragPath } from '../../shared/drag-path.js';
 /**
  * Optional Playwright runtime.
  * Works on long-running hosts (Docker/Render/Railway/Fly).
@@ -943,6 +944,19 @@ export async function mouseMoveXY(x: number, y: number) {
   const p = await getPage();
   await p.mouse.move(x, y);
   return { ok: true, x, y };
+}
+
+export async function mouseDragXY(fromX: number, fromY: number, toX: number, toY: number, steps = 25) {
+  const p = await getPage();
+  const path = buildDragPath({ x: fromX, y: fromY }, { x: toX, y: toY }, steps);
+  await p.mouse.move(fromX, fromY);
+  await p.mouse.down();
+  for (const pt of path.slice(1)) {
+    await p.mouse.move(pt.x, pt.y);
+    await p.waitForTimeout(8 + Math.round(Math.random() * 10));
+  }
+  await p.mouse.up();
+  return { ok: true, from: { x: fromX, y: fromY }, to: { x: toX, y: toY }, steps: path.length };
 }
 
 export async function selectOption(opts: { ref?: string; selector?: string; values: string[] }) {
