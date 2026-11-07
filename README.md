@@ -20,6 +20,12 @@ Vite + React UI + Express MCP server. Agents can:
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
 
+### AI Studio session findings (2026-11-07, measured live)
+
+- The UI flow itself works end-to-end in a real browser (new_chat → type → Run → response slot appears), but the Google Workspace account used (`ceo@ngantin.vn`) gets **"Permission denied. Please check your account permissions and project settings"** — Gemini usage is not enabled for that account (also "No API key selected"). Fix belongs to the Workspace admin / API project setup, not the app.
+- Google AI Studio's SPA does not render through the Vercel proxy (auth-gated XHR; empty extract) — UI automation of Google properties needs a real browser session.
+- The token API (`POST /api/prompt/run`) sidesteps both problems: measured **1.2–2.1s server-side (1.8–2.7s end-to-end)** for a short prompt, with the model cascade visible (gemini-3.5-flash → gemini-flash-lite-latest on rate-limit).
+
 ### v4.1.23 — hotfix: missing import crashed `/api/prompt/run` (`obmc-prompt-api-20261107`)
 
 - 4.1.22 shipped without the `prompt-api` import in server.ts (bundled without typecheck → ReferenceError at runtime → the route hung instead of erroring). Import fixed; `npm run typecheck` (tsc --noEmit) added to the toolchain and now part of the pre-ship gate.
