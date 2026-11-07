@@ -118782,15 +118782,44 @@ ${updatedDom.simplifiedTree.substring(0, 1200)}` : ""}`;
 init_mcp_auth();
 
 // server/prompt-api.ts
-function promptModelCascade(env = process.env) {
-  return [env.GEMINI_MODEL, "gemini-3.5-flash", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-flash-latest"].filter(Boolean);
+var THINKING_LEVELS = ["minimal", "low", "medium", "high"];
+function pickString(body, ...keys) {
+  for (const k of keys) {
+    const v = body?.[k];
+    if (typeof v === "string" && v.trim()) return v.trim();
+  }
+  return void 0;
 }
 function validatePromptRunRequest(body) {
   const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
   if (!prompt) return { error: "Thi\u1EBFu prompt (chu\u1ED7i 1-8000 k\xFD t\u1EF1)" };
   if (prompt.length > 8e3) return { error: "Prompt qu\xE1 d\xE0i (t\u1ED1i \u0111a 8000 k\xFD t\u1EF1)" };
-  const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim().slice(0, 64) : void 0;
-  return { prompt, model };
+  const model = pickString(body, "model")?.slice(0, 64);
+  const options = {};
+  const thinkingLevel = pickString(body, "thinkingLevel", "thinking_level")?.toLowerCase();
+  if (thinkingLevel) {
+    if (!THINKING_LEVELS.includes(thinkingLevel)) {
+      return { error: `thinkingLevel kh\xF4ng h\u1EE3p l\u1EC7 (${THINKING_LEVELS.join("/")})` };
+    }
+    options.thinkingLevel = thinkingLevel;
+  }
+  const rawTokens = body?.maxOutputTokens ?? body?.max_output_tokens;
+  if (rawTokens != null) {
+    const n = Number(rawTokens);
+    if (!Number.isInteger(n) || n < 1 || n > 65536) {
+      return { error: "maxOutputTokens ph\u1EA3i l\xE0 s\u1ED1 nguy\xEAn 1-65536" };
+    }
+    options.maxOutputTokens = n;
+  }
+  const systemInstructions = pickString(body, "systemInstructions", "system_instructions", "system_instruction");
+  if (systemInstructions) {
+    if (systemInstructions.length > 8e3) return { error: "systemInstructions qu\xE1 d\xE0i (t\u1ED1i \u0111a 8000 k\xFD t\u1EF1)" };
+    options.systemInstructions = systemInstructions;
+  }
+  return { prompt, model, options: Object.keys(options).length ? options : void 0 };
+}
+function promptModelCascade(env = process.env) {
+  return [env.GEMINI_MODEL, "gemini-3.5-flash", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-flash-latest"].filter(Boolean);
 }
 async function runPrompt(prompt, opts = {}) {
   const env = opts.env ?? process.env;
@@ -118801,14 +118830,22 @@ async function runPrompt(prompt, opts = {}) {
     apiKey,
     httpOptions: { headers: { "User-Agent": "aistudio-build" } }
   });
+  const { thinkingLevel, maxOutputTokens, systemInstructions } = opts.options ?? {};
+  const config = {};
+  if (maxOutputTokens) config.maxOutputTokens = maxOutputTokens;
+  if (systemInstructions) config.systemInstruction = systemInstructions;
+  if (thinkingLevel) config.thinkingConfig = { thinkingLevel };
+  const useConfig = Object.keys(config).length > 0;
   const started = Date.now();
   let lastError;
   for (const model of models) {
     try {
-      const response = await ai.models.generateContent({ model, contents: prompt });
+      const response = await ai.models.generateContent(
+        useConfig ? { model, contents: prompt, config } : { model, contents: prompt }
+      );
       const text3 = (response.candidates?.[0]?.content?.parts ?? []).map((p) => p.text || "").join("").trim();
       if (!text3) throw new Error("Empty response from " + model);
-      return { model, text: text3, timingMs: Date.now() - started };
+      return { model, text: text3, timingMs: Date.now() - started, config: useConfig ? config : void 0 };
     } catch (err) {
       lastError = err;
       if (/404|429|503|high demand|no longer available|not found/i.test(String(err?.message || err))) continue;
@@ -119152,11 +119189,11 @@ data: ${JSON.stringify({ error: err?.message || "Agent error" })}
   }
 });
 app.post("/api/prompt/run", requireMcpAuth, async (req, res) => {
-  const { prompt, model, error } = validatePromptRunRequest(req.body);
+  const { prompt, model, options, error } = validatePromptRunRequest(req.body);
   if (error || !prompt) {
     return res.status(400).json({ error: error || "Y\xEAu c\u1EA7u kh\xF4ng h\u1EE3p l\u1EC7" });
   }
-  const result = await runPrompt(prompt, { model });
+  const result = await runPrompt(prompt, { model, options });
   if (result.error) return res.status(502).json(result);
   res.json(result);
 });

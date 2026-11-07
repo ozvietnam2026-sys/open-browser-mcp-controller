@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.23** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.24** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -27,6 +27,10 @@ Vite + React UI + Express MCP server. Agents can:
 - The UI flow itself works end-to-end in a real browser (new_chat → type → Run → response slot appears), but the Google Workspace account used (`ceo@ngantin.vn`) gets **"Permission denied. Please check your account permissions and project settings"** — Gemini usage is not enabled for that account (also "No API key selected"). Fix belongs to the Workspace admin / API project setup, not the app.
 - Google AI Studio's SPA does not render through the Vercel proxy (auth-gated XHR; empty extract) — UI automation of Google properties needs a real browser session.
 - The token API (`POST /api/prompt/run`) sidesteps both problems: measured **1.2–2.1s server-side (1.8–2.7s end-to-end)** for a short prompt, with the model cascade visible (gemini-3.5-flash → gemini-flash-lite-latest on rate-limit).
+
+### v4.1.24 — `/api/prompt/run` speaks AI Studio's Get-code params (`obmc-prompt-api-20261107`)
+
+- The prompt API now accepts `thinking_level` (minimal|low|medium|high), `max_output_tokens` (1-65536) and `system_instructions` — in BOTH the snake_case AI Studio's Get code emits and camelCase. Configs copy from the Playground UI 1-1; the effective config is echoed back in the response (`config` field) alongside `model`, `text`, `timingMs`. Parameter names verified against the installed `@google/genai` typings.
 
 ### v4.1.23 — hotfix: missing import crashed `/api/prompt/run` (`obmc-prompt-api-20261107`)
 
