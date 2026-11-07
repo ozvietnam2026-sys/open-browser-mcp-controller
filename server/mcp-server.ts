@@ -412,11 +412,14 @@ export class McpServerHandler {
 
         if (format === 'text') {
           const chunk = sliceDocumentText(snapshot.fullText, snapshot.textExcerpt, readOffset);
+          const expandTrail = (snapshot.expandLog && snapshot.expandLog.length)
+            ? `\nExpand log: ${snapshot.expandLog.join(' ; ').slice(0, 400)}`
+            : '';
           return {
             content: [
               {
                 type: 'text',
-                text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTiêu đề: ${snapshot.title}\nURL: ${snapshot.url}${readMeta}\nNội dung văn bản (offset ${readOffset}):\n${chunk}`,
+                text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTiêu đề: ${snapshot.title}\nURL: ${snapshot.url}${readMeta}${expandTrail}\nNội dung văn bản (offset ${readOffset}):\n${chunk}`,
               },
             ],
           };

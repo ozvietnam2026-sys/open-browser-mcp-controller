@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.14** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.15** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -19,6 +19,10 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.15 — expose expand trail in `browser_get_dom` (`obmc-shadow-pierce-20261107`)
+
+- The `text` format now appends the bridge's `expandLog` trail (click signature, ok / NAVIGATED→blacklist+back) so any failing expand pass is diagnosable from a single MCP call instead of server-only logs.
 
 ### v4.1.14 — shadow-pierce + `browser_extract_listings` (`obmc-shadow-pierce-20261107`, `obmc-extract-listings-20261107`)
 

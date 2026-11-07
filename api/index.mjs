@@ -99082,13 +99082,15 @@ ${elementsList || "(Kh\xF4ng c\xF3 ph\u1EA7n t\u1EED t\u01B0\u01A1ng t\xE1c)"}
         }
         if (format === "text") {
           const chunk = sliceDocumentText(snapshot.fullText, snapshot.textExcerpt, readOffset);
+          const expandTrail = snapshot.expandLog && snapshot.expandLog.length ? `
+Expand log: ${snapshot.expandLog.join(" ; ").slice(0, 400)}` : "";
           return {
             content: [
               {
                 type: "text",
                 text: `Quan s\xE1t: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}
 Ti\xEAu \u0111\u1EC1: ${snapshot.title}
-URL: ${snapshot.url}${readMeta}
+URL: ${snapshot.url}${readMeta}${expandTrail}
 N\u1ED9i dung v\u0103n b\u1EA3n (offset ${readOffset}):
 ${chunk}`
               }
