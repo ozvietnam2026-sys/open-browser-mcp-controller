@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.19** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.20** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -19,6 +19,11 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.20 — per-host playbooks + real-page classifier fixtures (`obmc-host-playbooks-20261107`)
+
+- Research item #1 completed: the team's live-observed site knowledge (kho trường hợp site) is now data — `shared/host-playbooks.ts` carries canonical search URLs + wall notes for Made-in-China, Taobao, 1688, JD and AliExpress. The agent prompt gets a cheat sheet of all five URL shapes plus the full playbook of the site it currently sits on, killing the Google-first detour and invented URL shapes at the root.
+- Regression fixtures from real 2026-11-07 sessions lock the challenge classifier to the exact verbatim page strings: MiC not-available, MiC live listing, 1688 unusual traffic, Taobao login overlay, proxy fetch error.
 
 ### v4.1.19 — needs_user for read-complete-but-locked data (`obmc-human-assist-20261107`)
 

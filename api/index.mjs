@@ -100152,6 +100152,47 @@ ${fetchRewrite}
   }
 };
 
+// shared/host-playbooks.ts
+var HOST_PLAYBOOKS = [
+  {
+    id: "made-in-china",
+    hosts: ["made-in-china.com"],
+    searchUrl: (q) => `https://www.made-in-china.com/productdirectory.do?word=${encodeURIComponent(q.trim()).replace(/%20/g, "+")}&subaction=hunt`,
+    notes: 'Thay th\u1EBF: products-search/hot-china-products/{Title_Case}.html. KH\xD4NG d\xF9ng /multi-search/ c\xF3 "+" (404). Trang "The information you are looking for is not available currently" = URL sai (empty_or_not_ready), KH\xD4NG ph\u1EA3i t\u01B0\u1EDDng \u0111\u0103ng nh\u1EADp.'
+  },
+  {
+    id: "taobao",
+    hosts: ["taobao.com"],
+    searchUrl: (q) => `https://s.taobao.com/search?q=${encodeURIComponent(q.trim())}`,
+    notes: 'T\xECm b\u1EB1ng t\u1EEB kh\xF3a ti\u1EBFng Trung khi c\xF3 th\u1EC3. Overlay "\u4EB2\uFF0C\u8BF7\u767B\u5F55" / "Please try again" k\xE8m s\u1ED1 \u0111i\u1EC7n tho\u1EA1i/m\u1EADt kh\u1EA9u = login_wall \u2192 needs_user; QR ch\u1EC9 l\xE0 qr_app_login khi l\u1EDDi nh\u1EAFc r\xF5 "qu\xE9t QR/app \u0111\u1EC3 \u0111\u0103ng nh\u1EADp". Extract b\xE1o OK nh\u01B0ng kh\xF4ng c\xF3 listing \u2192 v\u1EABn l\xE0 login_wall/empty_or_not_ready, kh\xF4ng b\u1ECBa gi\xE1.'
+  },
+  {
+    id: "1688",
+    hosts: ["1688.com"],
+    searchUrl: (q) => `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(q.trim())}`,
+    notes: '"We have detected unusual traffic from your network" = unusual_traffic (m\u1EA1ng/IP), kh\xF4ng ph\u1EA3i captcha k\xE9o. M\xE3 QR g\xF3p \xFD/ph\u1EA3n h\u1ED3i tr\xEAn t\u01B0\u1EDDng \u0111\xF3 KH\xD4NG ph\u1EA3i QR \u0111\u0103ng nh\u1EADp. T\u01B0\u1EDDng n\xE0y kh\xF4ng c\xF3 thanh tr\u01B0\u1EE3t \u2014 \u0111\u1EEBng nh\u1EADn \u0111\xE3 x\u1EED l\xFD slider.'
+  },
+  {
+    id: "jd",
+    hosts: ["jd.com"],
+    searchUrl: (q) => `https://search.jd.com/Search?keyword=${encodeURIComponent(q.trim())}&enc=utf-8`,
+    notes: 'C\u1EA2NH B\xC1O: https://www.jd.com c\xF3 th\u1EC3 m\u1EDF trang c\xF4ng ty EN (About/Investors) \u2014 wrong_site_or_locale, kh\xF4ng ph\u1EA3i s\xE0n. Mu\u1ED1n t\xECm h\xE0ng ph\u1EA3i v\xE0o m\u1EB7t s\xE0n (search.jd.com). Kh\xF4ng k\u1EBFt lu\u1EADn "JD kh\xF4ng c\xF3 h\xE0ng" khi \u0111ang \u0111\u1EE9ng \u1EDF trang corporate.'
+  },
+  {
+    id: "aliexpress",
+    hosts: ["aliexpress.com"],
+    searchUrl: (q) => `https://www.aliexpress.com/wholesale?SearchText=${encodeURIComponent(q.trim())}`,
+    notes: 'Qua proxy hay g\u1EB7p fetch_error ("Kh\xF4ng th\u1EC3 k\u1EBFt n\u1ED1i t\u1EDBi trang web") \u2014 th\u1EED l\u1EA1i c\xF9ng URL, KH\xD4NG nh\u1EA3y sang trang demo n\u1ED9i b\u1ED9 \u0111\u1EC3 l\u1EA5y gi\xE1 thay th\u1EBF, kh\xF4ng b\u1ECBa listing.'
+  }
+];
+function playbookForHost(hostname) {
+  const host = (hostname || "").toLowerCase().replace(/^www\./, "");
+  return HOST_PLAYBOOKS.find((p) => p.hosts.some((h2) => host === h2 || host.endsWith("." + h2)));
+}
+function playbookCheatSheet() {
+  return HOST_PLAYBOOKS.map((p) => `- ${p.id}: ${p.searchUrl("T\u1EEA_KH\xD3A")}`).join("\n");
+}
+
 // node_modules/@google/genai/dist/node/index.mjs
 var import_p_retry = __toESM(require_p_retry(), 1);
 var import_google_auth_library = __toESM(require_src9(), 1);
@@ -118510,6 +118551,9 @@ ${PRICE_GROUNDING_RULES}
 ${CAPTCHA_INTERACTION_RULES}
 ${HUMAN_ASSIST_RULES}
 ${MIC_SEARCH_RULES}
+URL T\xCCM KI\u1EBEM CHU\u1EA8N THEO SITE (obmc-host-playbooks-20261107 \u2014 quan s\xE1t th\u1EADt, kh\xF4ng t\u1EF1 b\u1ECBa URL, kh\xF4ng \u0111i Google):
+${playbookCheatSheet()}
+N\u1EBFu nhi\u1EC7m v\u1EE5 thu\u1ED9c m\u1ED9t site \u1EDF tr\xEAn, d\xF9ng NGAY URL chu\u1EA9n t\u01B0\u01A1ng \u1EE9ng v\u1EDBi t\u1EEB kh\xF3a (m\xE3 h\xF3a URL).
 QUY T\u1EAEC QUAN S\xC1T HI\u1EC6N T\u1EA0I (obmc-challenge-detect-20261107):
 - Ch\u1EC9 d\xF9ng DOM thu\u1ED9c tabId + URL + navigationId hi\u1EC7n t\u1EA1i. B\u1ECF n\u1ED9i dung c\u1EE7a l\u1EA7n \u0111i\u1EC1u h\u01B0\u1EDBng tr\u01B0\u1EDBc.
 - ok ch\u1EC9 l\xE0 ch\u01B0a ph\xE1t hi\u1EC7n t\u01B0\u1EDDng, KH\xD4NG ch\u1EE9ng minh m\u1EE5c ti\xEAu ho\xE0n t\u1EA5t. QR ph\u1EA3n h\u1ED3i kh\xF4ng ph\u1EA3i QR \u0111\u0103ng nh\u1EADp.
@@ -118532,13 +118576,23 @@ NGUY\xCAN T\u1EAEC H\xC0NH \u0110\u1ED8NG:
     let formatNudgeUsed = false;
     const currentTab = browserState.getActiveTab();
     const initialDom = browserState.getDomSnapshot(currentTab.id);
+    let currentHostPlaybook = "";
+    try {
+      const pb = playbookForHost(new URL(currentTab.url).hostname);
+      if (pb) currentHostPlaybook = `
+PLAYBOOK SITE HI\u1EC6N T\u1EA0I (${pb.id}):
+- URL t\xECm ki\u1EBFm \u0111\xFAng: ${pb.searchUrl("T\u1EEA_KH\xD3A")}
+- L\u01B0u \xFD t\u01B0\u1EDDng/hi\u1EC7n t\u01B0\u1EE3ng: ${pb.notes}
+`;
+    } catch {
+    }
     const initialPrompt = `M\u1EE5c ti\xEAu c\u1EE7a ng\u01B0\u1EDDi d\xF9ng: "${task}"
 
 Tr\u1EA1ng th\xE1i tr\xECnh duy\u1EC7t hi\u1EC7n t\u1EA1i:
 - Tab hi\u1EC7n t\u1EA1i: [${currentTab.id}] "${currentTab.title}"
 - URL: ${currentTab.url}
 - Quan s\xE1t c\xF3 ngu\u1ED3n: ${JSON.stringify(classifyChallenge(currentTab, initialDom))}
-- T\xF3m t\u1EAFt DOM: ${initialDom ? initialDom.simplifiedTree.substring(0, 1e3) : "Ch\u01B0a c\xF3 th\xF4ng tin DOM, h\xE3y b\u1EAFt \u0111\u1EA7u b\u1EB1ng \u0111i\u1EC1u h\u01B0\u1EDBng ho\u1EB7c l\u1EA5y DOM."}
+- T\xF3m t\u1EAFt DOM: ${initialDom ? initialDom.simplifiedTree.substring(0, 1e3) : "Ch\u01B0a c\xF3 th\xF4ng tin DOM, h\xE3y b\u1EAFt \u0111\u1EA7u b\u1EB1ng \u0111i\u1EC1u h\u01B0\u1EDBng ho\u1EB7c l\u1EA5y DOM."}${currentHostPlaybook}
 
 H\xE3y ph\xE2n t\xEDch m\u1EE5c ti\xEAu v\xE0 quy\u1EBFt \u0111\u1ECBnh c\xF4ng c\u1EE5 \u0111\u1EA7u ti\xEAn c\u1EA7n g\u1ECDi.`;
     conversationContents.push({

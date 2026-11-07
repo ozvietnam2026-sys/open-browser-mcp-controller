@@ -1,4 +1,5 @@
 import { classifyChallenge, validateFinalAnswer, type AgentOutcome } from '../shared/challenge-state.js';
+import { playbookForHost, playbookCheatSheet } from '../shared/host-playbooks.js';
 /**
  * Autonomous Browser AI Agent powered by Gemini 3.8 Flash
  * Executes multi-step browser tasks using the expanded Browser MCP tools.
@@ -363,6 +364,9 @@ ${PRICE_GROUNDING_RULES}
 ${CAPTCHA_INTERACTION_RULES}
 ${HUMAN_ASSIST_RULES}
 ${MIC_SEARCH_RULES}
+URL TÌM KIẾM CHUẨN THEO SITE (obmc-host-playbooks-20261107 — quan sát thật, không tự bịa URL, không đi Google):
+${playbookCheatSheet()}
+Nếu nhiệm vụ thuộc một site ở trên, dùng NGAY URL chuẩn tương ứng với từ khóa (mã hóa URL).
 QUY TẮC QUAN SÁT HIỆN TẠI (obmc-challenge-detect-20261107):
 - Chỉ dùng DOM thuộc tabId + URL + navigationId hiện tại. Bỏ nội dung của lần điều hướng trước.
 - ok chỉ là chưa phát hiện tường, KHÔNG chứng minh mục tiêu hoàn tất. QR phản hồi không phải QR đăng nhập.
@@ -389,13 +393,22 @@ NGUYÊN TẮC HÀNH ĐỘNG:
     const currentTab = browserState.getActiveTab();
     const initialDom = browserState.getDomSnapshot(currentTab.id);
 
+    // obmc-host-playbooks-20261107 — give the model the RIGHT search URL for the site it is
+    // about to work on (live-observed playbook from the team's site-skill pack), so it stops
+    // detouring through Google or inventing URL shapes.
+    let currentHostPlaybook = '';
+    try {
+      const pb = playbookForHost(new URL(currentTab.url).hostname);
+      if (pb) currentHostPlaybook = `\nPLAYBOOK SITE HIỆN TẠI (${pb.id}):\n- URL tìm kiếm đúng: ${pb.searchUrl('TỪ_KHÓA')}\n- Lưu ý tường/hiện tượng: ${pb.notes}\n`;
+    } catch { /* browser:// or invalid URL — no host playbook */ }
+
     const initialPrompt = `Mục tiêu của người dùng: "${task}"
 
 Trạng thái trình duyệt hiện tại:
 - Tab hiện tại: [${currentTab.id}] "${currentTab.title}"
 - URL: ${currentTab.url}
 - Quan sát có nguồn: ${JSON.stringify(classifyChallenge(currentTab, initialDom))}
-- Tóm tắt DOM: ${initialDom ? initialDom.simplifiedTree.substring(0, 1000) : 'Chưa có thông tin DOM, hãy bắt đầu bằng điều hướng hoặc lấy DOM.'}
+- Tóm tắt DOM: ${initialDom ? initialDom.simplifiedTree.substring(0, 1000) : 'Chưa có thông tin DOM, hãy bắt đầu bằng điều hướng hoặc lấy DOM.'}${currentHostPlaybook}
 
 Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần gọi.`;
 
