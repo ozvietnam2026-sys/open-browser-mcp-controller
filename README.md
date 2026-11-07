@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.21** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.22** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -19,6 +19,11 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.22 — `POST /api/prompt/run`: AI Studio flow as an internal token API (`obmc-prompt-api-20261107`)
+
+- The AI Studio round trip (type a prompt, wait for the answer) is now a token-authenticated API for the internal team: `POST /api/prompt/run` with `{"prompt": "...", "model"?}` under the **same Bearer token as `/mcp`** (`requireMcpAuth` — first-party web UI stays same-origin). Response: `{model, text, timingMs}` — the model cascade mirrors the in-app agent (`GEMINI_MODEL` env first), and every call reports which model answered plus round-trip time.
+- Note: Google AI Studio's own SPA does not render through the Vercel proxy (auth-gated XHR); the UI flow is measured in a real browser, the API replaces it for programmatic use.
 
 ### v4.1.21 — polish: `+`-encoded keywords + navigate disconnect-retry (`obmc-nav-retry-20261107`)
 

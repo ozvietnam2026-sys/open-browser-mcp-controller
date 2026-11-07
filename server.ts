@@ -411,6 +411,18 @@ app.post('/api/agent/run', async (req: Request, res: Response) => {
   }
 });
 
+// obmc-prompt-api-20261107 — AI Studio flow as a token-authenticated internal API:
+// POST /api/prompt/run {prompt, model?} with the same Bearer token as /mcp.
+app.post('/api/prompt/run', requireMcpAuth, async (req: Request, res: Response) => {
+  const { prompt, model, error } = validatePromptRunRequest(req.body);
+  if (error || !prompt) {
+    return res.status(400).json({ error: error || 'Yêu cầu không hợp lệ' });
+  }
+  const result = await runPrompt(prompt, { model });
+  if (result.error) return res.status(502).json(result);
+  res.json(result);
+});
+
 // obmc-human-assist-20261107 — resume a job paused because it needs a human action in the pane
 app.post('/api/agent/resume', (req: Request, res: Response) => {
   const { jobId } = req.body;

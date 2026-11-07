@@ -119112,6 +119112,15 @@ data: ${JSON.stringify({ error: err?.message || "Agent error" })}
     res.end();
   }
 });
+app.post("/api/prompt/run", requireMcpAuth, async (req, res) => {
+  const { prompt, model, error } = validatePromptRunRequest(req.body);
+  if (error || !prompt) {
+    return res.status(400).json({ error: error || "Y\xEAu c\u1EA7u kh\xF4ng h\u1EE3p l\u1EC7" });
+  }
+  const result = await runPrompt(prompt, { model });
+  if (result.error) return res.status(502).json(result);
+  res.json(result);
+});
 app.post("/api/agent/resume", (req, res) => {
   const { jobId } = req.body;
   const resumed = jobId ? GeminiBrowserAgent.resumeJob(jobId) : false;
