@@ -2,19 +2,22 @@ import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { isExpandControl, formatReadProgress, sliceDocumentText, EXPAND_LABEL_RE } from '../shared/page-observation.js';
 
-describe('isExpandControl (obmc-deep-read-20261107)', () => {
-  test('accepts a collapsed View More button', () => {
+describe('isExpandControl (obmc-deep-read-20261107 v2)', () => {
+  test('accepts a collapsed aria-expanded toggle', () => {
     assert.equal(isExpandControl({ tagName: 'button', text: 'View More', ariaExpanded: 'false' }), true);
   });
-  test('accepts Chinese / Vietnamese wording and missing aria-expanded', () => {
-    assert.equal(isExpandControl({ tagName: 'button', text: '查看更多' }), true);
-    assert.equal(isExpandControl({ tagName: 'div', text: 'Xem thêm' }), true);
+  test('accepts label matches confirmed by toggle-ish class semantics (the MiC attrs toggle)', () => {
+    assert.equal(isExpandControl({ tagName: 'span', text: 'View More', className: 'J-product-attrs-toggle-text' }), true);
+    assert.equal(isExpandControl({ tagName: 'div', text: '查看更多', className: 'desc-toggle' }), true);
+  });
+  test('rejects a bare promo View More button with no class/aria confirmation (it navigates!)', () => {
+    assert.equal(isExpandControl({ tagName: 'button', text: 'View More', className: 'app-download-btn' }), false);
   });
   test('rejects navigation links, submits, already-expanded and long labels', () => {
-    assert.equal(isExpandControl({ tagName: 'a', text: 'View More', hasHref: true }), false);
-    assert.equal(isExpandControl({ tagName: 'button', text: 'View More', type: 'submit' }), false);
+    assert.equal(isExpandControl({ tagName: 'a', text: 'View More', hasHref: true, className: 'toggle' }), false);
+    assert.equal(isExpandControl({ tagName: 'button', text: 'View More', type: 'submit', className: 'toggle' }), false);
     assert.equal(isExpandControl({ tagName: 'button', text: 'View More', ariaExpanded: 'true' }), false);
-    assert.equal(isExpandControl({ tagName: 'button', text: 'This is a long product description about graphics cards and pricing' }), false);
+    assert.equal(isExpandControl({ tagName: 'button', text: 'This is a long product description about graphics cards and pricing', className: 'toggle' }), false);
     assert.equal(isExpandControl({ tagName: 'button', text: 'Buy Now' }), false);
   });
   test('label regex matches the marketplace wording we observed', () => {

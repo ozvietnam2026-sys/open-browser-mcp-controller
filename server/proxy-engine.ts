@@ -215,46 +215,62 @@ ${fetchRewrite}
                 return elements;
               }
 
-              // obmc-deep-read-20261107 — collapsed-content affordances: reveal-only toggles
-              // ("View More" v.v.). Never <a href>, never submit; bounded; clicked once per load.
+              // obmc-deep-read-20261107 v2 — reveal-only toggles, navigation-guarded, re-armed for late render.
+              // Lesson from Made-in-China live: some "View More" buttons NAVIGATE (app promos) while the
+              // real spec toggle shares the same label. A label match alone is not a safe signal:
+              // 1) strongest: [aria-expanded="false"]; 2) label match confirmed by toggle-ish CLASS semantics;
+              // 3) every click is navigation-guarded (auto history.back on href change).
               var EXPAND_LABEL_RE = /(view more|show more|show all|read more|see more|expand( all)?|查看更多|展开|显示更多|xem thêm)/i;
-              function isExpandControlNode(node) {
+              function nodeVisible(n) {
                 try {
-                  if (node.getAttribute('type') === 'submit') return false;
-                  if (node.tagName === 'A' && node.getAttribute('href')) return false;
-                  var label = ((node.innerText || node.textContent || '') + ' ' + (node.getAttribute('aria-label') || '')).trim();
-                  if (!label || label.length > 60) return false;
-                  if (!EXPAND_LABEL_RE.test(label)) return false;
-                  var expanded = node.getAttribute('aria-expanded');
-                  return expanded == null || expanded === 'false';
+                  var rect = n.getBoundingClientRect();
+                  var style = window.getComputedStyle(n);
+                  if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                  return rect.width > 0 || rect.height > 0;
                 } catch (e) { return false; }
               }
-              function findExpandControls() {
-                var nodes = Array.from(document.querySelectorAll('button, [role="button"], [aria-expanded]'));
-                return nodes.filter(function(n) {
-                  try {
-                    var rect = n.getBoundingClientRect();
-                    var style = window.getComputedStyle(n);
-                    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
-                    if (rect.width === 0 && rect.height === 0) return false;
-                    return isExpandControlNode(n);
-                  } catch (e) { return false; }
+              function expandCandidates() {
+                var seen = new Set();
+                var strong = Array.from(document.querySelectorAll('[aria-expanded="false"]'));
+                var labeled = Array.from(document.querySelectorAll('button, [role="button"], div, span')).filter(function(n) {
+                  if (n.closest('[aria-expanded]')) return false; // inner text of an aria toggle — strong set covers it
+                  var label = ((n.innerText || n.textContent || '') + ' ' + (n.getAttribute('aria-label') || '')).trim();
+                  if (!label || label.length > 60) return false;
+                  if (!EXPAND_LABEL_RE.test(label)) return false;
+                  var cls = (typeof n.className === 'string') ? n.className : '';
+                  if (!/toggle|expand|more|attrs/i.test(cls)) return false; // class must confirm reveal semantics
+                  if (n.tagName === 'A' && n.getAttribute('href')) return false;
+                  if (n.getAttribute('type') === 'submit') return false;
+                  return true;
+                });
+                return strong.concat(labeled).filter(function(n) {
+                  if (seen.has(n)) return false;
+                  seen.add(n);
+                  return nodeVisible(n);
                 });
               }
-              var expandClickedOnce = false;
-              function autoExpandCollapsed() {
-                if (expandClickedOnce) return 0;
-                expandClickedOnce = true;
-                var controls = findExpandControls().slice(0, 8);
-                controls.forEach(function(node) { try { node.click(); } catch (e) {} });
-                return controls.length;
+              var expandBudget = 8;
+              function autoExpandPass() {
+                var cands = expandCandidates().slice(0, expandBudget);
+                cands.forEach(function(node) {
+                  if (expandBudget <= 0) return;
+                  var hrefBefore = location.href;
+                  expandBudget--;
+                  try { node.click(); } catch (e) { return; }
+                  setTimeout(function() {
+                    if (location.href !== hrefBefore) {
+                      try { history.back(); } catch (e) {}
+                    }
+                  }, 600);
+                });
+                return cands.length;
               }
 
               function sendDomSnapshot() {
                 var interactive = collectInteractiveElements();
                 var bodyText = document.body ? document.body.innerText : '';
                 var collapsed = 0;
-                try { collapsed = findExpandControls().length; } catch (e) {}
+                try { collapsed = expandCandidates().length; } catch (e) {}
                 var snapshot = {
                   ...${safeJson(identity)},
                   documentUrl: ${safeJson(response.url || targetUrl.href)},
@@ -417,14 +433,15 @@ ${fetchRewrite}
               }
               window.addEventListener('load', function() { setTimeout(sendOnce, 400); });
               setTimeout(sendOnce, 1200);
-              // obmc-deep-read-20261107 — single bounded auto-expand pass after the first bound
-              // snapshot, then re-snapshot so collapsed/lazy sections (spec tables, HS codes…) land
-              // in fullText. One safety re-send later for slow AJAX; parent dedupes by fingerprint.
-              setTimeout(function() {
-                try { autoExpandCollapsed(); } catch (e) {}
-                setTimeout(sendDomSnapshot, 1200);
-              }, 1800);
-              setTimeout(sendDomSnapshot, 5200);
+              // obmc-deep-read v2 — re-armed expand passes (toggles render late on lazy pages),
+              // each followed by a snapshot; budget 8 clicks total; slow-AJAX safety re-send at the end.
+              [1800, 3600, 6500].forEach(function(delay) {
+                setTimeout(function() {
+                  try { autoExpandPass(); } catch (e) {}
+                  setTimeout(sendDomSnapshot, 1200);
+                }, delay);
+              });
+              setTimeout(sendDomSnapshot, 9000);
             } catch(e) {
               console.error('MCP Bridge Error:', e);
             }

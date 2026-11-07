@@ -17,19 +17,24 @@ export interface ExpandControlShape {
   ariaExpanded?: string | null;
   hasHref?: boolean;
   type?: string | null;
+  className?: string;
 }
 
 /**
  * A click target that only reveals more in-page content — never navigation or form submit.
- * Conservative on purpose: short labels matching the generic expand wording, no <a href>,
- * no submit inputs, not already expanded.
+ * v2 (live lesson from Made-in-China): a plain "View More" label can be an app-promo button that
+ * NAVIGATES. Strong signal = aria-expanded="false". Label matches count only when the element's
+ * class semantics confirm reveal intent (toggle/expand/more/attrs). No <a href>, no submit.
  */
 export function isExpandControl(attrs: ExpandControlShape): boolean {
   if (attrs.type === 'submit' || attrs.hasHref) return false;
+  if (attrs.ariaExpanded === 'false') return true;
+  if (attrs.ariaExpanded != null) return false; // 'true' → already expanded
   const label = `${attrs.text || ''} ${attrs.ariaLabel || ''}`.trim();
   if (!label || label.length > 60) return false;
   if (!EXPAND_LABEL_RE.test(label)) return false;
-  return attrs.ariaExpanded == null || attrs.ariaExpanded === 'false';
+  const cls = attrs.className || '';
+  return /toggle|expand|more|attrs/i.test(cls);
 }
 
 /** Read-progress meta so the model knows what it has NOT seen yet (anti "tưởng đã đọc hết"). */

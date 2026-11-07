@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.10** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Version: **4.1.11** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
@@ -19,6 +19,11 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.11 — deep read v2: navigation-guarded expand heuristic (`obmc-deep-read-20261107`)
+
+- Live lesson from Made-in-China: a bare "View More" button can be an app promo that NAVIGATES away mid-task while the real spec toggle shares the same label. Expand heuristic v2: strong signal is an aria-expanded="false" attribute; a label match only counts when the element class confirms reveal semantics (toggle/expand/more/attrs); every auto-click is navigation-guarded (auto history.back() if the href changed).
+- Expand passes re-arm at 1.8s/3.6s/6.5s for late-rendered toggles (the spec toggle renders after the first pass on lazy pages); total click budget 8; slow-AJAX safety re-snapshot at 9s.
 
 ### v4.1.10 — deep read: auto-expand + read progress + paginated text (`obmc-deep-read-20261107`)
 
