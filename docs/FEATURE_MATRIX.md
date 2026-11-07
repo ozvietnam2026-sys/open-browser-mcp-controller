@@ -5,6 +5,8 @@ Ideas are **reimplemented** (not copied) under compatible licenses; paid SaaS AP
 
 Legend: **adopted** = in repo · **planned** = backlog · **N/A** = not applicable / paid-only / desktop-OS only
 
+Related research (2026-11-07): [tinh-nang-co-the-tich-hop.md](research/tinh-nang-co-the-tich-hop.md) — what to integrate next (ARIA refs, schema extract, Render Chrome session, human Continue). Some `pw_*` tools below are already adopted; that note is about wiring them into the in-app agent and sourcing workflows.
+
 ## vercel-labs/agent-browser
 | Feature | Source | Status |
 |---|---|---|
