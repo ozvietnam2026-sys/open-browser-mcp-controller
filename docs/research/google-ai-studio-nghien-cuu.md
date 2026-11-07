@@ -112,6 +112,37 @@ Lưu ý kỹ thuật: SPA của Google **không render qua Vercel proxy** của 
 
    Khuyến nghị: `minimal`/`low` cho tác vụ trích xuất ngắn; `high` chỉ khi cần lập luận — và luôn đặt `max_output_tokens` hợp lý.
 
+## Phụ lục: buổi khảo sát tài khoản Pro (tối 7/11/2026, verified live)
+
+Tài khoản `gemini.wed@gmail.com` — **có gói Pro thật** (badge "Pro" cạnh avatar; nút "Unlock Gemini 4 Argon" biến mất = model cao cấp mở trong UI). Có 2 project GCP sẵn (Free tier): `n8n-app`, `make`.
+
+### Tạo API key: chỉ bàn tay người làm được
+
+- Click tự động (CDP) vào "Create API key" đều bị **"Failed to generate API key, The request is suspicious"** — anti-abuse của Google phân biệt click tự động. Key `obmc-team` (project `make`) được tạo **bằng tay** và hoạt động tốt.
+- Lưu key tại `~/Downloads/obmc-mcp/gemini-pro.key` (chmod 600, không commit).
+
+### Khám phá quan trọng nhất: Pro UI ≠ Pro API
+
+- Key của tài khoản Pro thấy **50 model** qua `GET /v1beta/models`, gồm: `gemini-4-argon`, `gemini-3.8-flash` (±tts/lite), `gemini-3.5-*`, `gemini-3.1-*`, `gemini-2.5-*`, `gemini-omni-*`, `nano-banana-pro-preview`, `gemini-nano-banana-2.1`, `lyria-3.5` (nhạc), `gemma-4-*`, `gemini-2.5-computer-use-preview`, `deep-research-*`, `antigravity-preview-*`, embedding…
+- NHƯNG gọi `gemini-4-argon:generateContent` bằng key đó → **429 quota ngay lập tức**: quota API tính theo **billing tier của PROJECT** (Free tier = không có Argon), gói Pro subscriber chỉ mở model trong **giao diện AI Studio**. Muốn Argon qua API phải bật billing cho project.
+
+### Mạng: API Google bị chặn từ IP Việt Nam
+
+- Từ máy VN: `generativelanguage.googleapis.com` **time out hoàn toàn** (60s, http 000) — mọi gọi API từ máy nội bộ phải đi qua egress nước ngoài.
+- Qua **page-proxy của OBMC** (Vercel): GET models ~0,4s OK; **POST generateContent ổn định ~57–64s** (chậm có hệ thống, không phải cold-start) — page-proxy chỉ dành cho trang web, không dùng để gọi API.
+- **Đường đúng cho API: server-side SDK** — chính là kiến trúc `/api/prompt/run` của OBMC (1,2–2,2s).
+
+### Lỗi còn hở (đã ghi nhận)
+
+- Tích hợp list-key của AI Studio với tài khoản này bị chặn ("Failed to list API keys: permission denied"; dialog link-key kẹt loading) — cần thao tác tay lần đầu trên máy thật để link key vào Playground.
+- Bảng so sánh quyết định cho team:
+
+| Nhu cầu | Dùng gì |
+|---|---|
+| Team gọi prompt API hàng ngày | `POST /api/prompt/run` OBMC (key server hiện tại, 1,2–2,2s) — KHÔNG đổi sang key Pro (không lợi quota) |
+| Thiết kế prompt, thử model mạnh trên UI | AI Studio tài khoản Pro (Argon mở sẵn) |
+| Argon/Pro-model qua API | Phải bật billing cho project GCP rồi tạo key trả phí — quyết định của CEO |
+
 ## Nguồn
 
 - Giao diện sống `aistudio.google.com` phiên `ceo@ngantin.vn`, 7/11/2026 (mọi mục ✅).
