@@ -99780,9 +99780,18 @@ ${fetchRewrite}
               }
               function expandCandidates() {
                 var seen = new Set();
-                var strong = Array.from(document.querySelectorAll('[aria-expanded="false"]'));
+                // v5: header/nav/footer mega-menu toggles also carry aria-expanded="false" and sit
+                // BEFORE body content in DOM order \u2014 they burned the whole click budget (see expandLog
+                // on MiC: mm-entry/cate-entrance/mm-item/upload-img-camera). Only content-region
+                // toggles are expand candidates.
+                var EXCLUDED_REGION = 'header, nav, footer, [role=navigation], [role=menu], [role=menubar], [aria-hidden="true"]';
+                function inContentRegion(n) {
+                  try { return !n.closest(EXCLUDED_REGION); } catch (e) { return false; }
+                }
+                var strong = Array.from(document.querySelectorAll('[aria-expanded="false"]')).filter(inContentRegion);
                 var labeled = Array.from(document.querySelectorAll('button, [role="button"], div, span')).filter(function(n) {
                   if (n.closest('[aria-expanded]')) return false; // inner text of an aria toggle \u2014 strong set covers it
+                  if (!inContentRegion(n)) return false;
                   var label = ((n.innerText || n.textContent || '') + ' ' + (n.getAttribute('aria-label') || '')).trim();
                   if (!label || label.length > 60) return false;
                   if (!EXPAND_LABEL_RE.test(label)) return false;
@@ -99795,7 +99804,7 @@ ${fetchRewrite}
                 return labeled.concat(strong).filter(function(n) {
                   if (seen.has(n)) return false;
                   seen.add(n);
-                  return nodeVisible(n) && !isBlacklisted(n);
+                  return nodeVisible(n);
                 });
               }
               function nodeSignature(n) {
