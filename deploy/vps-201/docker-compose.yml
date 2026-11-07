@@ -1,0 +1,20 @@
+# OBMC thường trực trên vps-201 — phiên Pro Gemini 24/7
+# Chạy: cp .env.example .env && nano .env && docker compose up -d --build
+services:
+  obmc:
+    build: ../..
+    container_name: obmc-vps201
+    restart: unless-stopped        # tự sống lại khi VPS reboot / container crash
+    ports:
+      - "3000:3000"                # đổi nếu trùng cổng; nhớ mở firewall
+    env_file: .env
+    environment:
+      - ENABLE_PLAYWRIGHT=1        # Chromium thật cho pw_* / phiên đăng nhập
+      - NODE_ENV=production
+    volumes:
+      # user-data-dir Chromium — COOKIE/PHIÊN ĐĂNG NHẬP SỐNG Ở ĐÂY, mất volume = mất phiên
+      - obmc-chrome-profile:/root/.cache/ms-playwright/mcp-chromium-profile
+      - obmc-mail:/app/data
+volumes:
+  obmc-chrome-profile:
+  obmc-mail:
