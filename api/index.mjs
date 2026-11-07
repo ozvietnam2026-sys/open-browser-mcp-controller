@@ -99826,11 +99826,16 @@ ${fetchRewrite}
                 } catch (e) {}
               }
               var expandBudget = 12;
-              // v4: click ONE candidate at a time and verify no navigation happened before the next.
+              // v6: one click per toggle per page load. Toggles flip BOTH ways \u2014 a second pass
+              // re-clicking the same toggle collapses what the first pass opened (observed live:
+              // product-attrs-toggle clicked in two passes, ended closed). A plain in-closure set
+              // (not sessionStorage) resets on reload, which is the desired retry path.
+              var expandClickedSet = new Set();
+              // v4/v6: click ONE candidate at a time and verify no navigation happened before the next.
               // A bad sibling (app-promo "View More" that navigates) used to trigger history.back(),
               // which restored the page to its pre-expand state and wasted the whole pass.
               function autoExpandPass() {
-                var cands = expandCandidates();
+                var cands = expandCandidates().filter(function(n) { return !expandClickedSet.has(nodeSignature(n)); });
                 var i = 0;
                 function step() {
                   if (expandBudget <= 0 || i >= cands.length) return;
@@ -99838,12 +99843,13 @@ ${fetchRewrite}
                   if (!node || !node.isConnected || isBlacklisted(node)) return step();
                   var hrefBefore = location.href;
                   expandBudget--;
-                  var sig = ((typeof node.className === 'string' ? node.className : '') + ':' + (node.innerText || '').trim().substring(0, 24));
-                  logExpand('click ' + sig);
-                  try { node.click(); } catch (e) { logExpand('click failed ' + sig); return step(); }
+                  var sig = nodeSignature(node);
+                  expandClickedSet.add(sig);
+                  logExpand('click ' + ((typeof node.className === 'string' ? node.className : '') + ':' + (node.innerText || '').trim().substring(0, 24)));
+                  try { node.click(); } catch (e) { logExpand('click failed'); return step(); }
                   setTimeout(function() {
                     if (location.href !== hrefBefore) {
-                      logExpand('NAVIGATED -> blacklist + back: ' + sig + ' (' + hrefBefore + ' -> ' + location.href + ')');
+                      logExpand('NAVIGATED -> blacklist + back: ' + sig);
                       blacklist(node);
                       try { history.back(); } catch (e) {}
                       setTimeout(step, 900); // let back() restore the document first
@@ -100086,13 +100092,13 @@ ${fetchRewrite}
               setTimeout(sendOnce, 1200);
               // obmc-deep-read v2 \u2014 re-armed expand passes (toggles render late on lazy pages),
               // each followed by a snapshot; budget 8 clicks total; slow-AJAX safety re-send at the end.
-              [1800, 3600, 6500].forEach(function(delay) {
+              [2800, 4600, 7000].forEach(function(delay) {
                 setTimeout(function() {
                   try { autoExpandPass(); } catch (e) {}
                   setTimeout(sendDomSnapshot, 1200);
                 }, delay);
               });
-              setTimeout(sendDomSnapshot, 9000);
+              setTimeout(sendDomSnapshot, 9500);
             } catch(e) {
               console.error('MCP Bridge Error:', e);
             }
