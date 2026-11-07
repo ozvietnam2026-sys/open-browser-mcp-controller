@@ -118780,6 +118780,45 @@ ${updatedDom.simplifiedTree.substring(0, 1200)}` : ""}`;
 
 // server.ts
 init_mcp_auth();
+
+// server/prompt-api.ts
+function promptModelCascade(env = process.env) {
+  return [env.GEMINI_MODEL, "gemini-3.5-flash", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-flash-latest"].filter(Boolean);
+}
+function validatePromptRunRequest(body) {
+  const prompt = typeof body?.prompt === "string" ? body.prompt.trim() : "";
+  if (!prompt) return { error: "Thi\u1EBFu prompt (chu\u1ED7i 1-8000 k\xFD t\u1EF1)" };
+  if (prompt.length > 8e3) return { error: "Prompt qu\xE1 d\xE0i (t\u1ED1i \u0111a 8000 k\xFD t\u1EF1)" };
+  const model = typeof body?.model === "string" && body.model.trim() ? body.model.trim().slice(0, 64) : void 0;
+  return { prompt, model };
+}
+async function runPrompt(prompt, opts = {}) {
+  const env = opts.env ?? process.env;
+  const apiKey = env.GEMINI_API_KEY;
+  if (!apiKey) return { model: "", text: "", timingMs: 0, error: getMissingGeminiKeyMessage(env) };
+  const models = opts.model ? [opts.model] : promptModelCascade(env);
+  const ai = new GoogleGenAI({
+    apiKey,
+    httpOptions: { headers: { "User-Agent": "aistudio-build" } }
+  });
+  const started = Date.now();
+  let lastError;
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({ model, contents: prompt });
+      const text3 = (response.candidates?.[0]?.content?.parts ?? []).map((p) => p.text || "").join("").trim();
+      if (!text3) throw new Error("Empty response from " + model);
+      return { model, text: text3, timingMs: Date.now() - started };
+    } catch (err) {
+      lastError = err;
+      if (/404|429|503|high demand|no longer available|not found/i.test(String(err?.message || err))) continue;
+      break;
+    }
+  }
+  return { model: models[0], text: "", timingMs: Date.now() - started, error: String(lastError?.message || lastError) };
+}
+
+// server.ts
 import_dotenv.default.config();
 var __filename2 = fileURLToPath(import.meta.url);
 var __dirname = path4.dirname(__filename2);

@@ -20,6 +20,7 @@ import { ProxyEngine } from './server/proxy-engine.js';
 import { GeminiBrowserAgent } from './server/gemini-agent.js';
 
 import { requireMcpAuth } from './server/mcp-auth.js';
+import { runPrompt, validatePromptRunRequest } from './server/prompt-api.js';
 
 dotenv.config();
 

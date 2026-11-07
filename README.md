@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.22** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.23** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -19,6 +19,10 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.23 — hotfix: missing import crashed `/api/prompt/run` (`obmc-prompt-api-20261107`)
+
+- 4.1.22 shipped without the `prompt-api` import in server.ts (bundled without typecheck → ReferenceError at runtime → the route hung instead of erroring). Import fixed; `npm run typecheck` (tsc --noEmit) added to the toolchain and now part of the pre-ship gate.
 
 ### v4.1.22 — `POST /api/prompt/run`: AI Studio flow as an internal token API (`obmc-prompt-api-20261107`)
 
