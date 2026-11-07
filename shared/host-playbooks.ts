@@ -27,13 +27,13 @@ export const HOST_PLAYBOOKS: HostPlaybook[] = [
   {
     id: '1688',
     hosts: ['1688.com'],
-    searchUrl: (q) => `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(q.trim())}`,
+    searchUrl: (q) => `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(q.trim()).replace(/%20/g, '+')}`,
     notes: '"We have detected unusual traffic from your network" = unusual_traffic (mạng/IP), không phải captcha kéo. Mã QR góp ý/phản hồi trên tường đó KHÔNG phải QR đăng nhập. Tường này không có thanh trượt — đừng nhận đã xử lý slider.',
   },
   {
     id: 'jd',
     hosts: ['jd.com'],
-    searchUrl: (q) => `https://search.jd.com/Search?keyword=${encodeURIComponent(q.trim())}&enc=utf-8`,
+    searchUrl: (q) => `https://search.jd.com/Search?keyword=${encodeURIComponent(q.trim()).replace(/%20/g, '+')}&enc=utf-8`,
     notes: 'CẢNH BÁO: https://www.jd.com có thể mở trang công ty EN (About/Investors) — wrong_site_or_locale, không phải sàn. Muốn tìm hàng phải vào mặt sàn (search.jd.com). Không kết luận "JD không có hàng" khi đang đứng ở trang corporate.',
   },
   {

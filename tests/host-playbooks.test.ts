@@ -14,10 +14,10 @@ describe('host playbooks (obmc-host-playbooks-20261107)', () => {
       'https://s.taobao.com/search?q=' + encodeURIComponent('显卡')
     );
     assert.equal(
-      playbookForHost('1688.com')!.searchUrl('显卡'),
-      'https://s.1688.com/selloffer/offer_search.htm?keywords=' + encodeURIComponent('显卡')
+      playbookForHost('1688.com')!.searchUrl('rtx pro'),
+      'https://s.1688.com/selloffer/offer_search.htm?keywords=rtx+pro'
     );
-    assert.match(playbookForHost('www.jd.com')!.searchUrl('gpu'), /search\.jd\.com/);
+    assert.match(playbookForHost('www.jd.com')!.searchUrl('rtx pro'), /keyword=rtx\+pro/);
     assert.match(playbookForHost('aliexpress.com')!.searchUrl('gpu'), /wholesale\?SearchText=/);
   });
 

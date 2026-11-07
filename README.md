@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.20** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.21** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -19,6 +19,11 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.21 — polish: `+`-encoded keywords + navigate disconnect-retry (`obmc-nav-retry-20261107`)
+
+- 1688/JD playbook URLs now encode spaces as `+` (matching MiC; these gateways reject `%20`).
+- `browser_navigate` retries once (1.8s grace) when the first attempt lands in the frontend SSE reconnect window ("UI disconnected") instead of surfacing the flake to the agent.
 
 ### v4.1.20 — per-host playbooks + real-page classifier fixtures (`obmc-host-playbooks-20261107`)
 

@@ -265,7 +265,15 @@ export class McpServerHandler {
         const targetTabId = activeTab?.id || 'tab-1';
 
         browserState.navigateTab(targetTabId, url);
-        const result = await browserState.waitForDocument(targetTabId);
+        let result = await browserState.waitForDocument(targetTabId);
+        // obmc-nav-retry-20261107 — the frontend SSE auto-reconnects, but a navigate landing in
+        // that dead window reports "UI disconnected" once. Retry once after the reconnect
+        // grace period instead of surfacing the flake to the agent.
+        if (!result.success && /UI disconnected/.test(result.error || '')) {
+          await new Promise((r) => setTimeout(r, 1800));
+          browserState.navigateTab(targetTabId, url);
+          result = await browserState.waitForDocument(targetTabId);
+        }
 
         return {
           isError: !result.success,

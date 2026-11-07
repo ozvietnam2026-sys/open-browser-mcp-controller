@@ -98958,7 +98958,12 @@ data: ${messageUrl}
         const activeTab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
         const targetTabId = activeTab?.id || "tab-1";
         browserState.navigateTab(targetTabId, url);
-        const result = await browserState.waitForDocument(targetTabId);
+        let result = await browserState.waitForDocument(targetTabId);
+        if (!result.success && /UI disconnected/.test(result.error || "")) {
+          await new Promise((r2) => setTimeout(r2, 1800));
+          browserState.navigateTab(targetTabId, url);
+          result = await browserState.waitForDocument(targetTabId);
+        }
         return {
           isError: !result.success,
           content: [
@@ -100169,13 +100174,13 @@ var HOST_PLAYBOOKS = [
   {
     id: "1688",
     hosts: ["1688.com"],
-    searchUrl: (q) => `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(q.trim())}`,
+    searchUrl: (q) => `https://s.1688.com/selloffer/offer_search.htm?keywords=${encodeURIComponent(q.trim()).replace(/%20/g, "+")}`,
     notes: '"We have detected unusual traffic from your network" = unusual_traffic (m\u1EA1ng/IP), kh\xF4ng ph\u1EA3i captcha k\xE9o. M\xE3 QR g\xF3p \xFD/ph\u1EA3n h\u1ED3i tr\xEAn t\u01B0\u1EDDng \u0111\xF3 KH\xD4NG ph\u1EA3i QR \u0111\u0103ng nh\u1EADp. T\u01B0\u1EDDng n\xE0y kh\xF4ng c\xF3 thanh tr\u01B0\u1EE3t \u2014 \u0111\u1EEBng nh\u1EADn \u0111\xE3 x\u1EED l\xFD slider.'
   },
   {
     id: "jd",
     hosts: ["jd.com"],
-    searchUrl: (q) => `https://search.jd.com/Search?keyword=${encodeURIComponent(q.trim())}&enc=utf-8`,
+    searchUrl: (q) => `https://search.jd.com/Search?keyword=${encodeURIComponent(q.trim()).replace(/%20/g, "+")}&enc=utf-8`,
     notes: 'C\u1EA2NH B\xC1O: https://www.jd.com c\xF3 th\u1EC3 m\u1EDF trang c\xF4ng ty EN (About/Investors) \u2014 wrong_site_or_locale, kh\xF4ng ph\u1EA3i s\xE0n. Mu\u1ED1n t\xECm h\xE0ng ph\u1EA3i v\xE0o m\u1EB7t s\xE0n (search.jd.com). Kh\xF4ng k\u1EBFt lu\u1EADn "JD kh\xF4ng c\xF3 h\xE0ng" khi \u0111ang \u0111\u1EE9ng \u1EDF trang corporate.'
   },
   {

@@ -1,4 +1,4 @@
-# Feature Matrix — Open Browser MCP Controller v4.1.8
+# Feature Matrix — Open Browser MCP Controller v4.1.21
 
 Inventory of advanced / lesser-known features researched from public sources and adoption status.
 Ideas are **reimplemented** (not copied) under compatible licenses; paid SaaS APIs are not required.
@@ -6,6 +6,18 @@ Ideas are **reimplemented** (not copied) under compatible licenses; paid SaaS AP
 Legend: **adopted** = in repo · **planned** = backlog · **N/A** = not applicable / paid-only / desktop-OS only
 
 Related research (2026-11-07): [tinh-nang-co-the-tich-hop.md](research/tinh-nang-co-the-tich-hop.md) — what to integrate next (ARIA refs, schema extract, Render Chrome session, human Continue). Some `pw_*` tools below are already adopted; that note is about wiring them into the in-app agent and sourcing workflows.
+
+## OBMC originals (2026-11-07 session, 4.1.9 → 4.1.21)
+
+| Capability | What it does | Status |
+|---|---|---|
+| Navigation re-bind (`obmc-nav-wait-20261107`) | `waitForDocument` polls for the NEWEST document across superseding navigations; 10s budget; disconnect-retry in `browser_navigate` | **adopted** |
+| Final-answer nudge (`obmc-final-nudge-20261107`) | one retry round-trip when the model answers in prose instead of the required JSON | **adopted** |
+| Deep read (`obmc-deep-read-20261107`) | read-progress meta, `fullText` ≤64KB, `browser_get_dom` `offset` pagination, auto-expand of reveal-only toggles (content-region only, one click per toggle, navigation-guarded + blacklist) | **adopted** |
+| Shadow-pierce (`obmc-shadow-pierce-20261107`) | snapshots append shadow-root-only text; `expandLog` trail exposed in `get_dom` | **adopted** |
+| `browser_extract_listings` (`obmc-extract-listings-20261107`) | deterministic CSS-schema listing extraction, no LLM, verbatim values, fail-closed on zero match | **adopted** |
+| Human-assist (`obmc-human-assist-20261107`) | `needs_user` pauses the job; amber banner + Tiếp tục button (`/api/agent/resume`); loop continues with fresh observation; 240s budget | **adopted** |
+| Host playbooks (`obmc-host-playbooks-20261107`) | per-site canonical search URLs + wall notes (MiC/Taobao/1688/JD/Ali) injected into the agent prompt; verbatim classifier fixtures | **adopted** |
 
 ## vercel-labs/agent-browser
 | Feature | Source | Status |
