@@ -153,6 +153,21 @@ Channel **obmc-gateway** đã tạo trên 9Router của team (`192.168.1.125:201
 - Cách agent khác gọi: `POST http://192.168.1.125:20128/v1/chat/completions` + Bearer key 9Router (vd key `obmc-chain-test`) + model `obmc/gemini-3.5-flash`
 - **Bằng chứng vòng dây** (đo 7/11): câu hỏi test → trả lời 4,6s trọn vòng (LAN→Vercel→Gemini), response id `chatcmpl-qa-mw6b6f3g-aqqol`, và bản ghi `qa-mw6b6f3g-aqqol` nằm trong kho QA của OBMC với `source: openai-compat` — tức mọi lượt hỏi qua 9Router đều **tự lưu** về OBMC để tra lại bằng `/api/qa/:id`.
 
+## Phụ lục 3: Gemini app (gemini.google.com) — đo UI + phân quyền (tối 7/11/2026)
+
+- **App Gemini ≠ AI Studio về phân quyền**: cùng tài khoản `ceo@ngantin.vn` bị AI Studio chặn "Permission denied" nhưng **app Gemini chạy bình thường** (sản phẩm consumer không cần API key/project). Máy tính đang giữ phiên app của ceo@ngantin.vn; tài khoản Pro (`gemini.wed@gmail.com`) ở tab AI Studio `/u/2` — muốn dùng Pro trong app thì đổi tài khoản trong avatar.
+- **Số đo UI trực tiếp** (câu hỏi chuẩn, gửi → hiện câu trả lời): **5,8 giây** với mode Flash (nhãn chế độ bên composer).
+
+### Bảng tốc độ tổng hợp (đo thực 7/11/2026, cùng 1 câu hỏi chuẩn)
+
+| Đường | Thời gian | Ghi chú |
+|---|---|---|
+| OBMC API server-side (`POST /api/prompt/run`) | **1,2–2,2s** | nhanh nhất; cascade model |
+| Qua 9Router (`obmc/gemini-3.5-flash`) | **4,6s** | LAN→Vercel→Gemini; tự lưu QA |
+| Gemini app UI (mode Flash) | **5,8s** | giao diện consumer |
+| AI Studio UI | — | bị chặn permission (project/key) |
+| Page-proxy POST generateContent | 57–64s | đường xấu, không dùng |
+
 ## Nguồn
 
 - Giao diện sống `aistudio.google.com` phiên `ceo@ngantin.vn`, 7/11/2026 (mọi mục ✅).
