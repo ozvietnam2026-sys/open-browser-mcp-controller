@@ -92,13 +92,25 @@ Lưu ý kỹ thuật: SPA của Google **không render qua Vercel proxy** của 
 
 1. **Thiết kế trên Playground**: chọn model → chỉnh Thinking level/Tools/System instructions → chạy thử, Edit/Rerun để so.
 2. **Get code** → copy `generation_config` đúng人意.
-3. **Gọi qua token OBMC** (không phụ thuộc quyền AI Studio cá nhân):
+3. **Gọi qua token OBMC** (không phụ thuộc quyền AI Studio cá nhân). Từ **v4.1.24**, API nhận đúng tham số Get code (cả snake_case lẫn camelCase):
    ```bash
    curl -X POST https://open-browser-mcp-controller-ten.vercel.app/api/prompt/run \
      -H "Authorization: Bearer <mcp-auth.token>" -H "Content-Type: application/json" \
-     -d '{"prompt": "...", "model": "gemini-3.8-flash"}'
+     -d '{"prompt": "...", "model": "gemini-3.8-flash",
+          "thinking_level": "medium", "max_output_tokens": 65536,
+          "system_instructions": "Luôn trả lời tiếng Việt."}'
    ```
-4. Gap hiện tại của `/api/prompt/run` (đề xuất v4.1.24): chưa nhận `thinking_level`, `max_output_tokens`, `system_instructions` — cấu hình lấy từ Get code chưa map đủ. Nếu duyệt, sẽ thêm 3 trường này khớp đúng tên tham số Get code sinh ra.
+   Response echo lại cấu hình hiệu dụng: `{model, text, timingMs, config}`.
+
+   **Số đo thực (v4.1.24, 7/11/2026) — chí phí của thinking_level:**
+
+   | Cấu hình | timingMs | Ghi chú |
+   |---|---|---|
+   | `thinking_level: minimal` + system_instructions | **2.234ms** | trả "Hà Nội." đúng chỉ dẫn ngắn gọn |
+   | `thinking_level: high` | **18.660ms** | cùng câu hỏi — chậm **8.4×** |
+   | không tham số (mặc định) | 1.231–2.115ms | cascade tự chọn model |
+
+   Khuyến nghị: `minimal`/`low` cho tác vụ trích xuất ngắn; `high` chỉ khi cần lập luận — và luôn đặt `max_output_tokens` hợp lý.
 
 ## Nguồn
 
