@@ -354,6 +354,42 @@ export const MCP_BROWSER_TOOLS: McpToolDefinition[] = [
     },
   },
   {
+    name: 'browser_extract_listings',
+    description:
+      'Trích danh sách sản phẩm/listing theo CSS schema KHÔNG dùng LLM: { baseSelector: selector của một ô listing, fields: [{ name, selector?, attr? }] }. Giá trị là chữ nguyên văn trên trang; trường không có thì để trống; không suy luận. Dùng khi cần bảng giá/MOQ/nhà cung cấp chính xác theo đúng trang đang mở.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        baseSelector: {
+          type: 'string',
+          description: 'CSS selector khớp MỖI ô listing (ví dụ ".product-list .item" hoặc "[class*=list] li").',
+        },
+        fields: {
+          type: 'array',
+          description: 'Các trường cần lấy. selector bỏ trống = lấy từ chính ô listing; attr (vd "href") = lấy thuộc tính thay vì text.',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Tên trường ra JSON (vd title, price_text, moq_text, supplier, url)' },
+              selector: { type: 'string', description: 'CSS selector trong phạm vi ô listing (tùy chọn)' },
+              attr: { type: 'string', description: 'Tên thuộc tính cần lấy, vd href (tùy chọn)' },
+            },
+            required: ['name'],
+          },
+        },
+        maxRows: {
+          type: 'number',
+          description: 'Số ô tối đa trả về (mặc định 40).',
+        },
+        tabId: {
+          type: 'string',
+          description: 'ID của tab thực hiện (mặc định tab active).',
+        },
+      },
+      required: ['baseSelector', 'fields'],
+    },
+  },
+  {
     name: 'browser_scroll',
     description: 'Cuộn trang web theo các hướng: down (xuống), up (lên), top (đầu trang), bottom (cuối trang) với khoảng cách pixel tùy chọn.',
     inputSchema: {

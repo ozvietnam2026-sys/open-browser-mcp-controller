@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.13** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
+Version: **4.1.14** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md) · Feature research (2026-11-07): [`docs/research/tinh-nang-co-the-tich-hop.md`](docs/research/tinh-nang-co-the-tich-hop.md)
 
 ---
 
@@ -19,6 +19,12 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.14 — shadow-pierce + `browser_extract_listings` (`obmc-shadow-pierce-20261107`, `obmc-extract-listings-20261107`)
+
+- **Shadow-DOM piercing**: bridge snapshots now append shadow-root-only text (`hasShadowText` marker in the snapshot) — content hydrated inside shadow roots was visible to humans but invisible to `body.innerText`/`querySelectorAll`. The expand pass also logs a debug trail (`expandLog`: click signature, ok / NAVIGATED→blacklist+back) that surfaces in server logs, settling the v4.1.13 open hypotheses on first failing run.
+- **`browser_extract_listings`** (mina research item #3): deterministic CSS-schema extraction with NO LLM — `{ baseSelector, fields:[{name, selector?, attr?}], maxRows }`. Rows are verbatim page strings; missing fields stay empty; zero-match returns a fail-closed error with page state instead of invented data. `extract_css` joins click/type/scroll as an allowed read-only external-iframe command.
+- Schema validation lives in `shared/listing-extract.ts` (pure, tested); tool declared for MCP clients and the in-app Gemini agent.
 
 ### v4.1.13 — deep read v4: sequential verified expansion (`obmc-deep-read-20261107`)
 

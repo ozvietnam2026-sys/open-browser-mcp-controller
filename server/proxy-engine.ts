@@ -280,13 +280,17 @@ ${fetchRewrite}
                   if (!node || !node.isConnected || isBlacklisted(node)) return step();
                   var hrefBefore = location.href;
                   expandBudget--;
-                  try { node.click(); } catch (e) { return step(); }
+                  var sig = ((typeof node.className === 'string' ? node.className : '') + ':' + (node.innerText || '').trim().substring(0, 24));
+                  logExpand('click ' + sig);
+                  try { node.click(); } catch (e) { logExpand('click failed ' + sig); return step(); }
                   setTimeout(function() {
                     if (location.href !== hrefBefore) {
+                      logExpand('NAVIGATED -> blacklist + back: ' + sig + ' (' + hrefBefore + ' -> ' + location.href + ')');
                       blacklist(node);
                       try { history.back(); } catch (e) {}
                       setTimeout(step, 900); // let back() restore the document first
                     } else {
+                      logExpand('ok ' + sig);
                       step();
                     }
                   }, 500);
@@ -295,9 +299,32 @@ ${fetchRewrite}
                 return cands.length;
               }
 
+              // obmc-shadow-pierce-20261107 — content hydrated inside shadow roots is visible to a
+              // human but invisible to body.innerText/querySelectorAll; append shadow-only text.
+              function shadowOnlyText() {
+                var parts = [];
+                try {
+                  Array.from(document.querySelectorAll('*')).forEach(function(el) {
+                    if (el.shadowRoot) {
+                      var t = (el.shadowRoot.textContent || '').trim();
+                      if (t) parts.push(t);
+                    }
+                  });
+                } catch (e) {}
+                return parts.join('\\n');
+              }
+              var expandLog = [];
+              function logExpand(msg) {
+                expandLog.push(msg);
+                if (expandLog.length > 24) expandLog.shift();
+                try { console.info('[mcp-expand] ' + msg); } catch (e) {}
+              }
+
               function sendDomSnapshot() {
                 var interactive = collectInteractiveElements();
                 var bodyText = document.body ? document.body.innerText : '';
+                var shadowText = shadowOnlyText();
+                var combinedText = shadowText ? bodyText + '\\n' + shadowText : bodyText;
                 var collapsed = 0;
                 try { collapsed = expandCandidates().length; } catch (e) {}
                 var snapshot = {
@@ -308,10 +335,12 @@ ${fetchRewrite}
                   simplifiedTree: interactive.map(function(el) {
                     return el.refId + ' <' + el.tagName + (el.type ? ' type="' + el.type + '"' : '') + '> ' + (el.text ? '"' + el.text + '"' : '') + (el.placeholder ? ' placeholder="' + el.placeholder + '"' : '');
                   }).join('\\n'),
-                  textExcerpt: bodyText.substring(0, 2000),
-                  fullText: bodyText.substring(0, 64000),
-                  textTotalLength: bodyText.length,
+                  textExcerpt: combinedText.substring(0, 2000),
+                  fullText: combinedText.substring(0, 64000),
+                  textTotalLength: combinedText.length,
                   collapsedControls: collapsed,
+                  hasShadowText: shadowText.length > 0,
+                  expandLog: expandLog.slice(),
                   scrollPosition: {
                     x: window.scrollX,
                     y: window.scrollY,
@@ -450,6 +479,41 @@ ${fetchRewrite}
 
                 if (data.type === 'MCP_REQUEST_DOM') {
                   sendDomSnapshot();
+                }
+
+                // obmc-extract-listings-20261107 — read-only CSS-schema extraction, no LLM:
+                // baseSelector per listing card, fields = name/selector/attr; values are verbatim.
+                if (data.type === 'MCP_EXECUTE_EXTRACT_CSS') {
+                  var rows = [];
+                  try {
+                    var bases = Array.from(document.querySelectorAll(data.baseSelector));
+                    rows = bases.slice(0, data.maxRows || 40).map(function(base) {
+                      var row = {};
+                      (data.fields || []).forEach(function(f) {
+                        var el = f.selector ? base.querySelector(f.selector) : base;
+                        var val = '';
+                        if (el) val = (f.attr ? el.getAttribute(f.attr) : (el.textContent || '')) || '';
+                        val = String(val).replace(/\\s+/g, ' ').trim().substring(0, 220);
+                        row[f.name] = val;
+                      });
+                      return row;
+                    });
+                    window.parent.postMessage({
+                      type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
+                      commandId: data.commandId,
+                      success: true,
+                      data: { rows: rows, matched: bases.length }
+                    }, '*');
+                  } catch (e) {
+                    window.parent.postMessage({
+                      type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
+                      commandId: data.commandId,
+                      success: false,
+                      error: 'Extract CSS lỗi: ' + (e && e.message ? e.message : String(e))
+                    }, '*');
+                  }
                 }
               });
 

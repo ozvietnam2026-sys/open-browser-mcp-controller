@@ -25143,6 +25143,41 @@ var init_mcp_browser_tools = __esm({
         }
       },
       {
+        name: "browser_extract_listings",
+        description: "Tr\xEDch danh s\xE1ch s\u1EA3n ph\u1EA9m/listing theo CSS schema KH\xD4NG d\xF9ng LLM: { baseSelector: selector c\u1EE7a m\u1ED9t \xF4 listing, fields: [{ name, selector?, attr? }] }. Gi\xE1 tr\u1ECB l\xE0 ch\u1EEF nguy\xEAn v\u0103n tr\xEAn trang; tr\u01B0\u1EDDng kh\xF4ng c\xF3 th\xEC \u0111\u1EC3 tr\u1ED1ng; kh\xF4ng suy lu\u1EADn. D\xF9ng khi c\u1EA7n b\u1EA3ng gi\xE1/MOQ/nh\xE0 cung c\u1EA5p ch\xEDnh x\xE1c theo \u0111\xFAng trang \u0111ang m\u1EDF.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            baseSelector: {
+              type: "string",
+              description: 'CSS selector kh\u1EDBp M\u1ED6I \xF4 listing (v\xED d\u1EE5 ".product-list .item" ho\u1EB7c "[class*=list] li").'
+            },
+            fields: {
+              type: "array",
+              description: 'C\xE1c tr\u01B0\u1EDDng c\u1EA7n l\u1EA5y. selector b\u1ECF tr\u1ED1ng = l\u1EA5y t\u1EEB ch\xEDnh \xF4 listing; attr (vd "href") = l\u1EA5y thu\u1ED9c t\xEDnh thay v\xEC text.',
+              items: {
+                type: "object",
+                properties: {
+                  name: { type: "string", description: "T\xEAn tr\u01B0\u1EDDng ra JSON (vd title, price_text, moq_text, supplier, url)" },
+                  selector: { type: "string", description: "CSS selector trong ph\u1EA1m vi \xF4 listing (t\xF9y ch\u1ECDn)" },
+                  attr: { type: "string", description: "T\xEAn thu\u1ED9c t\xEDnh c\u1EA7n l\u1EA5y, vd href (t\xF9y ch\u1ECDn)" }
+                },
+                required: ["name"]
+              }
+            },
+            maxRows: {
+              type: "number",
+              description: "S\u1ED1 \xF4 t\u1ED1i \u0111a tr\u1EA3 v\u1EC1 (m\u1EB7c \u0111\u1ECBnh 40)."
+            },
+            tabId: {
+              type: "string",
+              description: "ID c\u1EE7a tab th\u1EF1c hi\u1EC7n (m\u1EB7c \u0111\u1ECBnh tab active)."
+            }
+          },
+          required: ["baseSelector", "fields"]
+        }
+      },
+      {
         name: "browser_scroll",
         description: "Cu\u1ED9n trang web theo c\xE1c h\u01B0\u1EDBng: down (xu\u1ED1ng), up (l\xEAn), top (\u0111\u1EA7u trang), bottom (cu\u1ED1i trang) v\u1EDBi kho\u1EA3ng c\xE1ch pixel t\xF9y ch\u1ECDn.",
         inputSchema: {
@@ -98181,7 +98216,7 @@ function finalAnswerGate(tab, snapshot) {
   return { outcome, challenge };
 }
 function iframeCommandError(type) {
-  return ["click", "type", "scroll"].includes(type) ? void 0 : `Unsupported external iframe command: ${type}; not executed`;
+  return ["click", "type", "scroll", "extract_css"].includes(type) ? void 0 : `Unsupported external iframe command: ${type}; not executed`;
 }
 function validateFinalAnswer(tab, snapshot, text3, lastToolFailed = false) {
   const gate = finalAnswerGate(tab, snapshot);
@@ -98674,6 +98709,35 @@ function sliceDocumentText(fullText, excerpt, offset = 0, maxLen = READ_CHUNK) {
   const src = fullText && fullText.length ? fullText : excerpt;
   const safeOffset = Math.max(0, Math.min(offset, Math.max(0, src.length - 1)));
   return src.slice(safeOffset, safeOffset + maxLen);
+}
+
+// shared/listing-extract.ts
+var MAX_ROWS = 40;
+function normalizeExtractSchema(input) {
+  if (!input || typeof input !== "object") return { error: "Schema ph\u1EA3i l\xE0 object { baseSelector, fields }" };
+  const baseSelector = typeof input.baseSelector === "string" ? input.baseSelector.trim() : "";
+  if (!baseSelector) return { error: "Thi\u1EBFu baseSelector (CSS selector c\u1EE7a m\u1ED9t \xF4 listing)" };
+  if (baseSelector.length > 200) return { error: "baseSelector qu\xE1 d\xE0i (t\u1ED1i \u0111a 200 k\xFD t\u1EF1)" };
+  if (!Array.isArray(input.fields) || input.fields.length === 0) return { error: "Thi\u1EBFu m\u1EA3ng fields (m\u1ED7i field: name + selector t\xF9y ch\u1ECDn + attr t\xF9y ch\u1ECDn)" };
+  if (input.fields.length > 20) return { error: "Qu\xE1 nhi\u1EC1u fields (t\u1ED1i \u0111a 20)" };
+  const fields = [];
+  const seen = /* @__PURE__ */ new Set();
+  for (const f3 of input.fields) {
+    if (!f3 || typeof f3 !== "object" || typeof f3.name !== "string" || !f3.name.trim()) {
+      return { error: "M\u1ED7i field c\u1EA7n name (ki\u1EC3u ch\u1EEF)" };
+    }
+    const name = f3.name.trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) return { error: `T\xEAn field kh\xF4ng h\u1EE3p l\u1EC7: ${name} (ch\u1EC9 ch\u1EEF, s\u1ED1, _)` };
+    if (seen.has(name)) return { error: `Field tr\xF9ng t\xEAn: ${name}` };
+    seen.add(name);
+    fields.push({
+      name,
+      selector: typeof f3.selector === "string" && f3.selector.trim() ? f3.selector.trim().slice(0, 200) : void 0,
+      attr: typeof f3.attr === "string" && f3.attr.trim() ? f3.attr.trim().slice(0, 60) : void 0
+    });
+  }
+  const maxRows = Math.max(1, Math.min(Number(input.maxRows) || MAX_ROWS, MAX_ROWS));
+  return { schema: { baseSelector, fields, maxRows } };
 }
 
 // server/mcp-server.ts
@@ -99258,6 +99322,47 @@ ${JSON.stringify(result.data, null, 2)}` : `\u274C L\u1ED7i tr\xEDch xu\u1EA5t: 
           ]
         };
       }
+      case "browser_extract_listings": {
+        const { tabId } = args;
+        const { schema, error: schemaError } = normalizeExtractSchema(args);
+        if (schemaError || !schema) {
+          return { isError: true, content: [{ type: "text", text: `\u274C Schema kh\xF4ng h\u1EE3p l\u1EC7: ${schemaError}` }] };
+        }
+        const targetTab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
+        if (!targetTab) throw new Error(`Tab ${tabId} not found`);
+        const snapshot = browserState.getDomSnapshot(targetTab.id);
+        const challenge = classifyChallenge(targetTab, snapshot);
+        const result = await browserState.dispatchCommand(
+          "extract_css",
+          { baseSelector: schema.baseSelector, fields: schema.fields, maxRows: schema.maxRows },
+          targetTab.id
+        );
+        const rows = result.data?.rows ?? [];
+        if (!result.success || rows.length === 0) {
+          return {
+            isError: true,
+            content: [{
+              type: "text",
+              text: `Kh\xF4ng tr\xEDch \u0111\u01B0\u1EE3c listing n\xE0o v\u1EDBi baseSelector "${schema.baseSelector}".
+Tr\u1EA1ng th\xE1i trang: ${challenge.state}
+URL: ${targetTab.url}
+${rows.length === 0 && result.success ? "Selector kh\u1EDBp 0 \xF4 \u2014 ki\u1EC3m tra l\u1EA1i selector ho\u1EB7c trang ch\u01B0a t\u1EA3i listing." : result.error || ""}
+Kh\xF4ng b\u1ECBa d\u1EEF li\u1EC7u thay th\u1EBF.`
+            }]
+          };
+        }
+        return {
+          content: [{
+            type: "text",
+            text: `Tr\xEDch listing theo CSS schema (kh\xF4ng d\xF9ng LLM, ch\u1EEF nguy\xEAn v\u0103n):
+Tr\u1EA1ng th\xE1i trang: ${challenge.state}
+URL: ${targetTab.url}
+S\u1ED1 \xF4 kh\u1EDBp: ${result.data?.matched ?? rows.length} \xB7 tr\u1EA3 v\u1EC1: ${rows.length}
+
+${JSON.stringify(rows, null, 1)}`
+          }]
+        };
+      }
       case "browser_scroll": {
         const { direction, amount = 400, tabId } = args;
         const targetTab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
@@ -99722,13 +99827,17 @@ ${fetchRewrite}
                   if (!node || !node.isConnected || isBlacklisted(node)) return step();
                   var hrefBefore = location.href;
                   expandBudget--;
-                  try { node.click(); } catch (e) { return step(); }
+                  var sig = ((typeof node.className === 'string' ? node.className : '') + ':' + (node.innerText || '').trim().substring(0, 24));
+                  logExpand('click ' + sig);
+                  try { node.click(); } catch (e) { logExpand('click failed ' + sig); return step(); }
                   setTimeout(function() {
                     if (location.href !== hrefBefore) {
+                      logExpand('NAVIGATED -> blacklist + back: ' + sig + ' (' + hrefBefore + ' -> ' + location.href + ')');
                       blacklist(node);
                       try { history.back(); } catch (e) {}
                       setTimeout(step, 900); // let back() restore the document first
                     } else {
+                      logExpand('ok ' + sig);
                       step();
                     }
                   }, 500);
@@ -99737,9 +99846,32 @@ ${fetchRewrite}
                 return cands.length;
               }
 
+              // obmc-shadow-pierce-20261107 \u2014 content hydrated inside shadow roots is visible to a
+              // human but invisible to body.innerText/querySelectorAll; append shadow-only text.
+              function shadowOnlyText() {
+                var parts = [];
+                try {
+                  Array.from(document.querySelectorAll('*')).forEach(function(el) {
+                    if (el.shadowRoot) {
+                      var t = (el.shadowRoot.textContent || '').trim();
+                      if (t) parts.push(t);
+                    }
+                  });
+                } catch (e) {}
+                return parts.join('\\n');
+              }
+              var expandLog = [];
+              function logExpand(msg) {
+                expandLog.push(msg);
+                if (expandLog.length > 24) expandLog.shift();
+                try { console.info('[mcp-expand] ' + msg); } catch (e) {}
+              }
+
               function sendDomSnapshot() {
                 var interactive = collectInteractiveElements();
                 var bodyText = document.body ? document.body.innerText : '';
+                var shadowText = shadowOnlyText();
+                var combinedText = shadowText ? bodyText + '\\n' + shadowText : bodyText;
                 var collapsed = 0;
                 try { collapsed = expandCandidates().length; } catch (e) {}
                 var snapshot = {
@@ -99750,10 +99882,12 @@ ${fetchRewrite}
                   simplifiedTree: interactive.map(function(el) {
                     return el.refId + ' <' + el.tagName + (el.type ? ' type="' + el.type + '"' : '') + '> ' + (el.text ? '"' + el.text + '"' : '') + (el.placeholder ? ' placeholder="' + el.placeholder + '"' : '');
                   }).join('\\n'),
-                  textExcerpt: bodyText.substring(0, 2000),
-                  fullText: bodyText.substring(0, 64000),
-                  textTotalLength: bodyText.length,
+                  textExcerpt: combinedText.substring(0, 2000),
+                  fullText: combinedText.substring(0, 64000),
+                  textTotalLength: combinedText.length,
                   collapsedControls: collapsed,
+                  hasShadowText: shadowText.length > 0,
+                  expandLog: expandLog.slice(),
                   scrollPosition: {
                     x: window.scrollX,
                     y: window.scrollY,
@@ -99892,6 +100026,41 @@ ${fetchRewrite}
 
                 if (data.type === 'MCP_REQUEST_DOM') {
                   sendDomSnapshot();
+                }
+
+                // obmc-extract-listings-20261107 \u2014 read-only CSS-schema extraction, no LLM:
+                // baseSelector per listing card, fields = name/selector/attr; values are verbatim.
+                if (data.type === 'MCP_EXECUTE_EXTRACT_CSS') {
+                  var rows = [];
+                  try {
+                    var bases = Array.from(document.querySelectorAll(data.baseSelector));
+                    rows = bases.slice(0, data.maxRows || 40).map(function(base) {
+                      var row = {};
+                      (data.fields || []).forEach(function(f) {
+                        var el = f.selector ? base.querySelector(f.selector) : base;
+                        var val = '';
+                        if (el) val = (f.attr ? el.getAttribute(f.attr) : (el.textContent || '')) || '';
+                        val = String(val).replace(/\\s+/g, ' ').trim().substring(0, 220);
+                        row[f.name] = val;
+                      });
+                      return row;
+                    });
+                    window.parent.postMessage({
+                      type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
+                      commandId: data.commandId,
+                      success: true,
+                      data: { rows: rows, matched: bases.length }
+                    }, '*');
+                  } catch (e) {
+                    window.parent.postMessage({
+                      type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
+                      commandId: data.commandId,
+                      success: false,
+                      error: 'Extract CSS l\u1ED7i: ' + (e && e.message ? e.message : String(e))
+                    }, '*');
+                  }
                 }
               });
 
@@ -118222,6 +118391,34 @@ var GeminiBrowserAgent = class {
             submitRef: { type: Type.STRING, description: "M\xE3 @ref n\xFAt submit" }
           },
           required: ["fields"]
+        }
+      },
+      {
+        name: "browser_extract_listings",
+        description: "Tr\xEDch danh s\xE1ch s\u1EA3n ph\u1EA9m theo CSS schema KH\xD4NG d\xF9ng LLM: { baseSelector: selector c\u1EE7a m\u1ED9t \xF4 listing, fields: [{name, selector?, attr?}] }. Gi\xE1 tr\u1ECB nguy\xEAn v\u0103n t\u1EEB trang; tr\u01B0\u1EDDng thi\u1EBFu \u0111\u1EC3 tr\u1ED1ng; kh\xF4ng suy lu\u1EADn gi\xE1. \u01AFu ti\xEAn tool n\xE0y khi c\u1EA7n b\u1EA3ng gi\xE1/MOQ/nh\xE0 cung c\u1EA5p t\u1EEB trang \u0111ang m\u1EDF.",
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            baseSelector: {
+              type: Type.STRING,
+              description: 'CSS selector kh\u1EDBp m\u1ED7i \xF4 listing, v\xED d\u1EE5 "[class*=product] li"'
+            },
+            fields: {
+              type: Type.ARRAY,
+              description: "Danh s\xE1ch tr\u01B0\u1EDDng: name (title/price_text/moq_text/supplier/url), selector trong \xF4, attr n\u1EBFu l\u1EA5y thu\u1ED9c t\xEDnh",
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  selector: { type: Type.STRING },
+                  attr: { type: Type.STRING }
+                },
+                required: ["name"]
+              }
+            },
+            maxRows: { type: Type.NUMBER }
+          },
+          required: ["baseSelector", "fields"]
         }
       },
       {

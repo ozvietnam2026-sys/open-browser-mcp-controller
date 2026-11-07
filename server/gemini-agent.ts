@@ -258,6 +258,35 @@ const MAX_STEPS = 14;
         },
       },
       {
+        name: 'browser_extract_listings',
+        description:
+          'Trích danh sách sản phẩm theo CSS schema KHÔNG dùng LLM: { baseSelector: selector của một ô listing, fields: [{name, selector?, attr?}] }. Giá trị nguyên văn từ trang; trường thiếu để trống; không suy luận giá. Ưu tiên tool này khi cần bảng giá/MOQ/nhà cung cấp từ trang đang mở.',
+        parameters: {
+          type: Type.OBJECT,
+          properties: {
+            baseSelector: {
+              type: Type.STRING,
+              description: 'CSS selector khớp mỗi ô listing, ví dụ "[class*=product] li"',
+            },
+            fields: {
+              type: Type.ARRAY,
+              description: 'Danh sách trường: name (title/price_text/moq_text/supplier/url), selector trong ô, attr nếu lấy thuộc tính',
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  selector: { type: Type.STRING },
+                  attr: { type: Type.STRING },
+                },
+                required: ['name'],
+              },
+            },
+            maxRows: { type: Type.NUMBER },
+          },
+          required: ['baseSelector', 'fields'],
+        },
+      },
+      {
         name: 'browser_scroll',
         description: 'Cuộn trang web (direction: "down", "up", "top", "bottom")',
         parameters: {

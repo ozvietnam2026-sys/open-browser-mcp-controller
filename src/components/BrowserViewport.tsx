@@ -904,6 +904,17 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
               },
               '*'
             );
+          } else if (cmd.type === 'extract_css') {
+            iframeRef.current.contentWindow.postMessage(
+              {
+                type: 'MCP_EXECUTE_EXTRACT_CSS',
+                commandId: cmd.id,
+                baseSelector: cmd.params?.baseSelector,
+                fields: cmd.params?.fields,
+                maxRows: cmd.params?.maxRows,
+              },
+              '*'
+            );
           }
         }
       } catch (err) {

@@ -55,6 +55,9 @@ export interface DomSnapshot {
   fullText?: string;
   textTotalLength?: number;
   collapsedControls?: number;
+  /** obmc-shadow-pierce-20261107 — whether shadow-root text was appended; expand-pass debug trail. */
+  hasShadowText?: boolean;
+  expandLog?: string[];
   scrollPosition: { x: number; y: number; maxScrollY: number };
   timestamp: number;
 }
@@ -77,6 +80,7 @@ export interface BrowserCommand {
     | 'select_option'
     | 'wait_for'
     | 'extract_content'
+    | 'extract_css'
     | 'fill_form'
     | 'scroll'
     | 'screenshot'

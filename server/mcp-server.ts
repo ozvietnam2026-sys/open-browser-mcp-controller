@@ -11,6 +11,7 @@ import { MCP_BROWSER_TOOLS } from './mcp-browser-tools.js';
 import { ALL_MCP_TOOLS, getVisibleTools, executeRegisteredTool } from './tools-registry.js';
 import { getConfig } from './config.js';
 import { formatReadProgress, sliceDocumentText } from '../shared/page-observation.js';
+import { normalizeExtractSchema } from '../shared/listing-extract.js';
 
 export { MCP_BROWSER_TOOLS };
 export { ALL_MCP_TOOLS };
@@ -692,6 +693,41 @@ export class McpServerHandler {
                 : `❌ Lỗi trích xuất: ${result.error}`,
             },
           ],
+        };
+      }
+
+      case 'browser_extract_listings': {
+        // obmc-extract-listings-20261107 — deterministic CSS-schema extraction, no LLM.
+        // Values are verbatim page strings; missing fields stay empty; nothing is inferred.
+        const { tabId } = args;
+        const { schema, error: schemaError } = normalizeExtractSchema(args);
+        if (schemaError || !schema) {
+          return { isError: true, content: [{ type: 'text', text: `❌ Schema không hợp lệ: ${schemaError}` }] };
+        }
+        const targetTab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
+        if (!targetTab) throw new Error(`Tab ${tabId} not found`);
+        const snapshot = browserState.getDomSnapshot(targetTab.id);
+        const challenge = classifyChallenge(targetTab, snapshot);
+        const result = await browserState.dispatchCommand(
+          'extract_css',
+          { baseSelector: schema.baseSelector, fields: schema.fields, maxRows: schema.maxRows },
+          targetTab.id
+        );
+        const rows: Record<string, string>[] = result.data?.rows ?? [];
+        if (!result.success || rows.length === 0) {
+          return {
+            isError: true,
+            content: [{
+              type: 'text',
+              text: `Không trích được listing nào với baseSelector "${schema.baseSelector}".\nTrạng thái trang: ${challenge.state}\nURL: ${targetTab.url}\n${rows.length === 0 && result.success ? 'Selector khớp 0 ô — kiểm tra lại selector hoặc trang chưa tải listing.' : result.error || ''}\nKhông bịa dữ liệu thay thế.`,
+            }],
+          };
+        }
+        return {
+          content: [{
+            type: 'text',
+            text: `Trích listing theo CSS schema (không dùng LLM, chữ nguyên văn):\nTrạng thái trang: ${challenge.state}\nURL: ${targetTab.url}\nSố ô khớp: ${result.data?.matched ?? rows.length} · trả về: ${rows.length}\n\n${JSON.stringify(rows, null, 1)}`,
+          }],
         };
       }
 

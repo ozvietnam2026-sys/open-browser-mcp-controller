@@ -50,7 +50,9 @@ export function finalAnswerGate(tab: BrowserTab, snapshot?: DomSnapshot) {
   return { outcome, challenge };
 }
 export function iframeCommandError(type: string): string | undefined {
-  return ['click', 'type', 'scroll'].includes(type) ? undefined :
+  // obmc-extract-listings-20261107 — extract_css is a read-only DOM query, safe on external iframes
+  // (click/type/scroll mutate; extract_css only reads and returns verbatim strings).
+  return ['click', 'type', 'scroll', 'extract_css'].includes(type) ? undefined :
     `Unsupported external iframe command: ${type}; not executed`;
 }
 
