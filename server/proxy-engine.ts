@@ -215,9 +215,46 @@ ${fetchRewrite}
                 return elements;
               }
 
+              // obmc-deep-read-20261107 — collapsed-content affordances: reveal-only toggles
+              // ("View More" v.v.). Never <a href>, never submit; bounded; clicked once per load.
+              var EXPAND_LABEL_RE = /(view more|show more|show all|read more|see more|expand( all)?|查看更多|展开|显示更多|xem thêm)/i;
+              function isExpandControlNode(node) {
+                try {
+                  if (node.getAttribute('type') === 'submit') return false;
+                  if (node.tagName === 'A' && node.getAttribute('href')) return false;
+                  var label = ((node.innerText || node.textContent || '') + ' ' + (node.getAttribute('aria-label') || '')).trim();
+                  if (!label || label.length > 60) return false;
+                  if (!EXPAND_LABEL_RE.test(label)) return false;
+                  var expanded = node.getAttribute('aria-expanded');
+                  return expanded == null || expanded === 'false';
+                } catch (e) { return false; }
+              }
+              function findExpandControls() {
+                var nodes = Array.from(document.querySelectorAll('button, [role="button"], [aria-expanded]'));
+                return nodes.filter(function(n) {
+                  try {
+                    var rect = n.getBoundingClientRect();
+                    var style = window.getComputedStyle(n);
+                    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                    if (rect.width === 0 && rect.height === 0) return false;
+                    return isExpandControlNode(n);
+                  } catch (e) { return false; }
+                });
+              }
+              var expandClickedOnce = false;
+              function autoExpandCollapsed() {
+                if (expandClickedOnce) return 0;
+                expandClickedOnce = true;
+                var controls = findExpandControls().slice(0, 8);
+                controls.forEach(function(node) { try { node.click(); } catch (e) {} });
+                return controls.length;
+              }
+
               function sendDomSnapshot() {
                 var interactive = collectInteractiveElements();
-                var textExcerpt = document.body ? document.body.innerText.substring(0, 2000) : '';
+                var bodyText = document.body ? document.body.innerText : '';
+                var collapsed = 0;
+                try { collapsed = findExpandControls().length; } catch (e) {}
                 var snapshot = {
                   ...${safeJson(identity)},
                   documentUrl: ${safeJson(response.url || targetUrl.href)},
@@ -226,7 +263,10 @@ ${fetchRewrite}
                   simplifiedTree: interactive.map(function(el) {
                     return el.refId + ' <' + el.tagName + (el.type ? ' type="' + el.type + '"' : '') + '> ' + (el.text ? '"' + el.text + '"' : '') + (el.placeholder ? ' placeholder="' + el.placeholder + '"' : '');
                   }).join('\\n'),
-                  textExcerpt: textExcerpt,
+                  textExcerpt: bodyText.substring(0, 2000),
+                  fullText: bodyText.substring(0, 64000),
+                  textTotalLength: bodyText.length,
+                  collapsedControls: collapsed,
                   scrollPosition: {
                     x: window.scrollX,
                     y: window.scrollY,
@@ -377,6 +417,14 @@ ${fetchRewrite}
               }
               window.addEventListener('load', function() { setTimeout(sendOnce, 400); });
               setTimeout(sendOnce, 1200);
+              // obmc-deep-read-20261107 — single bounded auto-expand pass after the first bound
+              // snapshot, then re-snapshot so collapsed/lazy sections (spec tables, HS codes…) land
+              // in fullText. One safety re-send later for slow AJAX; parent dedupes by fingerprint.
+              setTimeout(function() {
+                try { autoExpandCollapsed(); } catch (e) {}
+                setTimeout(sendDomSnapshot, 1200);
+              }, 1800);
+              setTimeout(sendDomSnapshot, 5200);
             } catch(e) {
               console.error('MCP Bridge Error:', e);
             }

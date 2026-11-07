@@ -256,9 +256,10 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
 
     setElements(scanned);
 
-    const textExcerpt = containerRef.current.innerText
-      ? containerRef.current.innerText.substring(0, 2000)
-      : '';
+    // obmc-deep-read-20261107 — full text + read-progress meta alongside the 2000-char excerpt.
+    const bodyText = containerRef.current.innerText || '';
+    const collapsedControls = containerRef.current.querySelectorAll('[aria-expanded="false"]').length;
+    const textExcerpt = bodyText.substring(0, 2000);
     const snapshot: DomSnapshot = {
       tabId: activeTabId, navigationId,
       url,
@@ -278,6 +279,9 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
         })
         .join('\n'),
       textExcerpt,
+      fullText: bodyText.substring(0, 64000),
+      textTotalLength: bodyText.length,
+      collapsedControls,
       scrollPosition: {
         x: containerRef.current.scrollLeft,
         y: containerRef.current.scrollTop,
@@ -288,7 +292,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
 
     onSnapshotUpdatedRef.current?.(snapshot);
 
-    const fingerprint = `${activeTabId}:${navigationId}|${snapshot.url}|${snapshot.title}|${scanned.length}|${textExcerpt.length}`;
+    const fingerprint = `${activeTabId}:${navigationId}|${snapshot.url}|${snapshot.title}|${scanned.length}|${bodyText.length}|${collapsedControls}`;
     if (fingerprint === lastPostedFingerprintRef.current) return;
     lastPostedFingerprintRef.current = fingerprint;
 
@@ -337,7 +341,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
         onTitleChange(data.snapshot.title || 'Trang web');
         onSnapshotUpdated?.(data.snapshot);
 
-        const fingerprint = `${activeTabId}:${navigationId}|${data.snapshot.url}|${data.snapshot.title}|${els.length}|${(data.snapshot.textExcerpt || '').length}`;
+        const fingerprint = `${activeTabId}:${navigationId}|${data.snapshot.url}|${data.snapshot.title}|${els.length}|${(data.snapshot.textExcerpt || '').length}|${data.snapshot.textTotalLength ?? 0}`;
         if (fingerprint === lastPostedFingerprintRef.current) return;
         lastPostedFingerprintRef.current = fingerprint;
 

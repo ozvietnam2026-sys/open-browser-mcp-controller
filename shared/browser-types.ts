@@ -51,6 +51,10 @@ export interface DomSnapshot {
   interactiveElements: InteractiveElement[];
   simplifiedTree: string;
   textExcerpt: string;
+  /** obmc-deep-read-20261107 — full visible text (bounded) + read-progress meta for paginated reads. */
+  fullText?: string;
+  textTotalLength?: number;
+  collapsedControls?: number;
   scrollPosition: { x: number; y: number; maxScrollY: number };
   timestamp: number;
 }

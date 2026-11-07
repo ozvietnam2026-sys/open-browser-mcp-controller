@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.9** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Version: **4.1.10** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
@@ -19,6 +19,13 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.10 — deep read: auto-expand + read progress + paginated text (`obmc-deep-read-20261107`)
+
+- **Auto-expand pass**: after the first bound snapshot, the proxied-page bridge clicks reveal-only toggles (`View More / Show more / Read more / 查看更多 / Xem thêm`, `aria-expanded="false"`) once per load, bounded at 8, never `<a href>` / submit — then re-snapshots. Lazy-loaded spec tables (e.g. Made-in-China product HS Code) now land in the observation instead of staying invisible until a human clicks.
+- **Read-progress meta**: every `browser_get_dom` response carries `Tiến trình đọc: đã đọc X/Y ký tự · còn N mục thu gọn` — the model is told explicitly what it has NOT seen and must not declare information missing before reading to the end.
+- **Paginated reads**: snapshots now carry `fullText` (bounded 64KB) + `textTotalLength`; `browser_get_dom` accepts `offset` to page through long documents instead of the old hard 2.000-char cut.
+- Agent prompt rule added: hidden/lazy content is expected on marketplace pages — expand, page through, and only then conclude.
 
 ### v4.1.9 — navigation wait re-bind + final-answer format nudge (`obmc-nav-wait-20261107`, `obmc-final-nudge-20261107`)
 

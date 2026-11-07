@@ -79,7 +79,7 @@ export const MCP_BROWSER_TOOLS: McpToolDefinition[] = [
   {
     name: 'browser_get_dom',
     description:
-      'Đọc cây DOM, cấu trúc trang web, cây trợ năng và danh sách các phần tử tương tác (interactive elements) với mã tham chiếu duy nhất (@ref:1, @ref:2...) để click hoặc gõ phím chính xác.',
+      'Đọc cây DOM, cấu trúc trang web, cây trợ năng và danh sách các phần tử tương tác (interactive elements) với mã tham chiếu duy nhất (@ref:1, @ref:2...) để click hoặc gõ phím chính xác. Kèm dòng "Tiến trình đọc" cho biết đã đọc bao nhiêu / tổng ký tự và còn mục nào thu gọn — chưa đọc hết thì KHÔNG kết luận trang thiếu thông tin, hãy đọc tiếp bằng offset.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -91,7 +91,12 @@ export const MCP_BROWSER_TOOLS: McpToolDefinition[] = [
           type: 'string',
           enum: ['interactive_elements', 'simplified', 'full', 'text'],
           description:
-            'Định dạng trả về: "interactive_elements" (danh sách nút/input với mã @ref), "simplified" (cây phân cấp rút gọn), "text" (toàn bộ nội dung văn bản), hoặc "full".',
+            'Định dạng trả về: "interactive_elements" (danh sách nút/input với mã @ref), "simplified" (cây phân cấp rút gọn), "text" (nội dung văn bản theo từng đoạn), hoặc "full".',
+        },
+        offset: {
+          type: 'number',
+          description:
+            'Vị trí ký tự bắt đầu đọc (mặc định 0). Trang dài sẽ được trả theo từng đoạn ~2000 ký tự; tăng offset bằng số đã đọc để đọc tiếp phần còn lại.',
         },
       },
     },

@@ -24879,7 +24879,7 @@ var init_mcp_browser_tools = __esm({
       },
       {
         name: "browser_get_dom",
-        description: "\u0110\u1ECDc c\xE2y DOM, c\u1EA5u tr\xFAc trang web, c\xE2y tr\u1EE3 n\u0103ng v\xE0 danh s\xE1ch c\xE1c ph\u1EA7n t\u1EED t\u01B0\u01A1ng t\xE1c (interactive elements) v\u1EDBi m\xE3 tham chi\u1EBFu duy nh\u1EA5t (@ref:1, @ref:2...) \u0111\u1EC3 click ho\u1EB7c g\xF5 ph\xEDm ch\xEDnh x\xE1c.",
+        description: '\u0110\u1ECDc c\xE2y DOM, c\u1EA5u tr\xFAc trang web, c\xE2y tr\u1EE3 n\u0103ng v\xE0 danh s\xE1ch c\xE1c ph\u1EA7n t\u1EED t\u01B0\u01A1ng t\xE1c (interactive elements) v\u1EDBi m\xE3 tham chi\u1EBFu duy nh\u1EA5t (@ref:1, @ref:2...) \u0111\u1EC3 click ho\u1EB7c g\xF5 ph\xEDm ch\xEDnh x\xE1c. K\xE8m d\xF2ng "Ti\u1EBFn tr\xECnh \u0111\u1ECDc" cho bi\u1EBFt \u0111\xE3 \u0111\u1ECDc bao nhi\xEAu / t\u1ED5ng k\xFD t\u1EF1 v\xE0 c\xF2n m\u1EE5c n\xE0o thu g\u1ECDn \u2014 ch\u01B0a \u0111\u1ECDc h\u1EBFt th\xEC KH\xD4NG k\u1EBFt lu\u1EADn trang thi\u1EBFu th\xF4ng tin, h\xE3y \u0111\u1ECDc ti\u1EBFp b\u1EB1ng offset.',
         inputSchema: {
           type: "object",
           properties: {
@@ -24890,7 +24890,11 @@ var init_mcp_browser_tools = __esm({
             format: {
               type: "string",
               enum: ["interactive_elements", "simplified", "full", "text"],
-              description: '\u0110\u1ECBnh d\u1EA1ng tr\u1EA3 v\u1EC1: "interactive_elements" (danh s\xE1ch n\xFAt/input v\u1EDBi m\xE3 @ref), "simplified" (c\xE2y ph\xE2n c\u1EA5p r\xFAt g\u1ECDn), "text" (to\xE0n b\u1ED9 n\u1ED9i dung v\u0103n b\u1EA3n), ho\u1EB7c "full".'
+              description: '\u0110\u1ECBnh d\u1EA1ng tr\u1EA3 v\u1EC1: "interactive_elements" (danh s\xE1ch n\xFAt/input v\u1EDBi m\xE3 @ref), "simplified" (c\xE2y ph\xE2n c\u1EA5p r\xFAt g\u1ECDn), "text" (n\u1ED9i dung v\u0103n b\u1EA3n theo t\u1EEBng \u0111o\u1EA1n), ho\u1EB7c "full".'
+            },
+            offset: {
+              type: "number",
+              description: "V\u1ECB tr\xED k\xFD t\u1EF1 b\u1EAFt \u0111\u1EA7u \u0111\u1ECDc (m\u1EB7c \u0111\u1ECBnh 0). Trang d\xE0i s\u1EBD \u0111\u01B0\u1EE3c tr\u1EA3 theo t\u1EEBng \u0111o\u1EA1n ~2000 k\xFD t\u1EF1; t\u0103ng offset b\u1EB1ng s\u1ED1 \u0111\xE3 \u0111\u1ECDc \u0111\u1EC3 \u0111\u1ECDc ti\u1EBFp ph\u1EA7n c\xF2n l\u1EA1i."
             }
           }
         }
@@ -98656,6 +98660,23 @@ var browserState = new BrowserStateManager();
 init_mcp_browser_tools();
 init_tools_registry();
 init_config();
+
+// shared/page-observation.ts
+var READ_CHUNK = 2e3;
+function formatReadProgress(opts) {
+  const total = opts.total > 0 ? String(opts.total) : "?";
+  const parts = [`\u0111\xE3 \u0111\u1ECDc ${opts.read}/${total} k\xFD t\u1EF1`];
+  if (opts.total > opts.read) parts.push("c\xF2n n\u1ED9i dung ch\u01B0a \u0111\u1ECDc: g\u1ECDi browser_get_dom v\u1EDBi offset \u0111\u1EC3 \u0111\u1ECDc ti\u1EBFp");
+  if (opts.collapsed && opts.collapsed > 0) parts.push(`${opts.collapsed} m\u1EE5c v\u1EABn c\xF2n thu g\u1ECDn`);
+  return parts.join(" \xB7 ");
+}
+function sliceDocumentText(fullText, excerpt, offset = 0, maxLen = READ_CHUNK) {
+  const src = fullText && fullText.length ? fullText : excerpt;
+  const safeOffset = Math.max(0, Math.min(offset, Math.max(0, src.length - 1)));
+  return src.slice(safeOffset, safeOffset + maxLen);
+}
+
+// server/mcp-server.ts
 var mcpSessions = /* @__PURE__ */ new Map();
 var McpServerHandler = class _McpServerHandler {
   // SSE Transport: GET /mcp/sse
@@ -98942,7 +98963,7 @@ ${formatted}`
         };
       }
       case "browser_get_dom": {
-        const { tabId, format = "interactive_elements" } = args;
+        const { tabId, format = "interactive_elements", offset } = args;
         const targetTab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
         if (!targetTab) throw new Error(`Tab ${tabId} not found`);
         let snapshot = browserState.getDomSnapshot(targetTab.id);
@@ -98964,6 +98985,11 @@ ${formatted}`
             ]
           };
         }
+        const readOffset = Math.max(0, Math.min(Number.parseInt(String(offset ?? "0"), 10) || 0, 1e6));
+        const totalLen = snapshot.textTotalLength ?? (snapshot.fullText ? snapshot.fullText.length : snapshot.textExcerpt.length);
+        const readMeta = `
+Ti\u1EBFn tr\xECnh \u0111\u1ECDc: ${formatReadProgress({ read: readOffset + (format === "text" ? sliceDocumentText(snapshot.fullText, snapshot.textExcerpt, readOffset).length : snapshot.textExcerpt.length), total: totalLen, collapsed: snapshot.collapsedControls })}
+`;
         if (format === "interactive_elements") {
           const elementsList = snapshot.interactiveElements.map((el) => {
             const details = [
@@ -98981,8 +99007,7 @@ ${formatted}`
                 type: "text",
                 text: `Quan s\xE1t: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}
 Trang: "${snapshot.title}"
-URL: ${snapshot.url}
-
+URL: ${snapshot.url}${readMeta}
 C\xE1c ph\u1EA7n t\u1EED t\u01B0\u01A1ng t\xE1c (@ref) tr\xEAn trang:
 ${elementsList || "(Kh\xF4ng c\xF3 ph\u1EA7n t\u1EED t\u01B0\u01A1ng t\xE1c)"}
 
@@ -98992,16 +99017,16 @@ ${elementsList || "(Kh\xF4ng c\xF3 ph\u1EA7n t\u1EED t\u01B0\u01A1ng t\xE1c)"}
           };
         }
         if (format === "text") {
+          const chunk = sliceDocumentText(snapshot.fullText, snapshot.textExcerpt, readOffset);
           return {
             content: [
               {
                 type: "text",
                 text: `Quan s\xE1t: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}
 Ti\xEAu \u0111\u1EC1: ${snapshot.title}
-URL: ${snapshot.url}
-
-N\u1ED9i dung v\u0103n b\u1EA3n:
-${snapshot.textExcerpt}`
+URL: ${snapshot.url}${readMeta}
+N\u1ED9i dung v\u0103n b\u1EA3n (offset ${readOffset}):
+${chunk}`
               }
             ]
           };
@@ -99632,9 +99657,46 @@ ${fetchRewrite}
                 return elements;
               }
 
+              // obmc-deep-read-20261107 \u2014 collapsed-content affordances: reveal-only toggles
+              // ("View More" v.v.). Never <a href>, never submit; bounded; clicked once per load.
+              var EXPAND_LABEL_RE = /(view more|show more|show all|read more|see more|expand( all)?|\u67E5\u770B\u66F4\u591A|\u5C55\u5F00|\u663E\u793A\u66F4\u591A|xem th\xEAm)/i;
+              function isExpandControlNode(node) {
+                try {
+                  if (node.getAttribute('type') === 'submit') return false;
+                  if (node.tagName === 'A' && node.getAttribute('href')) return false;
+                  var label = ((node.innerText || node.textContent || '') + ' ' + (node.getAttribute('aria-label') || '')).trim();
+                  if (!label || label.length > 60) return false;
+                  if (!EXPAND_LABEL_RE.test(label)) return false;
+                  var expanded = node.getAttribute('aria-expanded');
+                  return expanded == null || expanded === 'false';
+                } catch (e) { return false; }
+              }
+              function findExpandControls() {
+                var nodes = Array.from(document.querySelectorAll('button, [role="button"], [aria-expanded]'));
+                return nodes.filter(function(n) {
+                  try {
+                    var rect = n.getBoundingClientRect();
+                    var style = window.getComputedStyle(n);
+                    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') return false;
+                    if (rect.width === 0 && rect.height === 0) return false;
+                    return isExpandControlNode(n);
+                  } catch (e) { return false; }
+                });
+              }
+              var expandClickedOnce = false;
+              function autoExpandCollapsed() {
+                if (expandClickedOnce) return 0;
+                expandClickedOnce = true;
+                var controls = findExpandControls().slice(0, 8);
+                controls.forEach(function(node) { try { node.click(); } catch (e) {} });
+                return controls.length;
+              }
+
               function sendDomSnapshot() {
                 var interactive = collectInteractiveElements();
-                var textExcerpt = document.body ? document.body.innerText.substring(0, 2000) : '';
+                var bodyText = document.body ? document.body.innerText : '';
+                var collapsed = 0;
+                try { collapsed = findExpandControls().length; } catch (e) {}
                 var snapshot = {
                   ...${safeJson(identity)},
                   documentUrl: ${safeJson(response.url || targetUrl.href)},
@@ -99643,7 +99705,10 @@ ${fetchRewrite}
                   simplifiedTree: interactive.map(function(el) {
                     return el.refId + ' <' + el.tagName + (el.type ? ' type="' + el.type + '"' : '') + '> ' + (el.text ? '"' + el.text + '"' : '') + (el.placeholder ? ' placeholder="' + el.placeholder + '"' : '');
                   }).join('\\n'),
-                  textExcerpt: textExcerpt,
+                  textExcerpt: bodyText.substring(0, 2000),
+                  fullText: bodyText.substring(0, 64000),
+                  textTotalLength: bodyText.length,
+                  collapsedControls: collapsed,
                   scrollPosition: {
                     x: window.scrollX,
                     y: window.scrollY,
@@ -99794,6 +99859,14 @@ ${fetchRewrite}
               }
               window.addEventListener('load', function() { setTimeout(sendOnce, 400); });
               setTimeout(sendOnce, 1200);
+              // obmc-deep-read-20261107 \u2014 single bounded auto-expand pass after the first bound
+              // snapshot, then re-snapshot so collapsed/lazy sections (spec tables, HS codes\u2026) land
+              // in fullText. One safety re-send later for slow AJAX; parent dedupes by fingerprint.
+              setTimeout(function() {
+                try { autoExpandCollapsed(); } catch (e) {}
+                setTimeout(sendDomSnapshot, 1200);
+              }, 1800);
+              setTimeout(sendDomSnapshot, 5200);
             } catch(e) {
               console.error('MCP Bridge Error:', e);
             }
@@ -118001,13 +118074,17 @@ var GeminiBrowserAgent = class {
       },
       {
         name: "browser_get_dom",
-        description: "\u0110\u1ECDc danh s\xE1ch c\xE1c ph\u1EA7n t\u1EED t\u01B0\u01A1ng t\xE1c (@ref:1, @ref:2...) v\xE0 c\u1EA5u tr\xFAc trang web hi\u1EC7n t\u1EA1i",
+        description: '\u0110\u1ECDc danh s\xE1ch c\xE1c ph\u1EA7n t\u1EED t\u01B0\u01A1ng t\xE1c (@ref:1, @ref:2...) v\xE0 c\u1EA5u tr\xFAc trang web hi\u1EC7n t\u1EA1i. K\xE8m "Ti\u1EBFn tr\xECnh \u0111\u1ECDc" (\u0111\xE3 \u0111\u1ECDc/t\u1ED5ng k\xFD t\u1EF1, m\u1EE5c c\xF2n thu g\u1ECDn): ch\u01B0a \u0111\u1ECDc h\u1EBFt th\xEC \u0111\u1EEBng k\u1EBFt lu\u1EADn trang thi\u1EBFu th\xF4ng tin \u2014 \u0111\u1ECDc ti\u1EBFp b\u1EB1ng offset.',
         parameters: {
           type: Type.OBJECT,
           properties: {
             format: {
               type: Type.STRING,
               description: "interactive_elements ho\u1EB7c text"
+            },
+            offset: {
+              type: Type.NUMBER,
+              description: "V\u1ECB tr\xED k\xFD t\u1EF1 b\u1EAFt \u0111\u1EA7u khi \u0111\u1ECDc ti\u1EBFp trang d\xE0i (m\u1EB7c \u0111\u1ECBnh 0)"
             }
           }
         }
@@ -118161,6 +118238,11 @@ QUY T\u1EAEC QUAN S\xC1T HI\u1EC6N T\u1EA0I (obmc-challenge-detect-20261107):
 - \u1EA2nh browser_screenshot hi\u1EC7n ch\u1EC9 l\xE0 canvas m\xF4 ph\u1ECFng, kh\xF4ng ph\u1EA3i pixel website th\u1EADt. External iframe ch\u01B0a h\u1ED7 tr\u1EE3 drag/extract; kh\xF4ng h\u1EE9a v\u01B0\u1EE3t captcha.
 - Khi k\u1EBFt th\xFAc, tr\u1EA3 JSON thu\u1EA7n: {"outcome":"completed|blocked|needs_user|failed","answer":"tr\u1EA3 l\u1EDDi ti\u1EBFng Vi\u1EC7t","evidence":"tr\xEDch nguy\xEAn v\u0103n \xEDt nh\u1EA5t 8 k\xFD t\u1EF1 t\u1EEB DOM hi\u1EC7n t\u1EA1i ch\u1EE9ng minh m\u1EE5c ti\xEAu \u0111\u1EA1t \u0111\u01B0\u1EE3c"}.
 - Ch\u1EC9 ch\u1ECDn completed khi m\u1EE5c ti\xEAu th\u1EF1c s\u1EF1 \u0111\u1EA1t \u0111\u01B0\u1EE3c; h\u1EBFt b\u01B0\u1EDBc / kh\xF4ng g\u1ECDi tool / n\u1ED9i dung r\u1ED7ng kh\xF4ng ph\u1EA3i th\xE0nh c\xF4ng.
+QUAN TR\u1ECCNG \u2014 N\u1ED8I DUNG \u1EA8N TR\xCAN TRANG (obmc-deep-read-20261107):
+- Th\xF4ng tin then ch\u1ED1t (th\xF4ng s\u1ED1, HS Code, chi ti\u1EBFt nh\xE0 cung c\u1EA5p) th\u01B0\u1EDDng n\u1EB1m sau n\xFAt "View More/Show more/\u67E5\u770B\u66F4\u591A" ho\u1EB7c t\u1EA3i tr\u1EC5. H\u1EC7 th\u1ED1ng t\u1EF1 b\u1EA5m c\xE1c n\xFAt m\u1EDF r\u1ED9ng n\xE0y m\u1ED9t l\u1EA7n sau khi trang t\u1EA3i.
+- M\u1ED7i l\u1EA7n \u0111\u1ECDc DOM c\xF3 d\xF2ng "Ti\u1EBFn tr\xECnh \u0111\u1ECDc: \u0111\xE3 \u0111\u1ECDc X/Y k\xFD t\u1EF1 \xB7 c\xF2n m\u1EE5c thu g\u1ECDn". Ch\u01B0a \u0111\u1ECDc h\u1EBFt (X < Y) th\xEC TUY\u1EC6T \u0110\u1ED0I KH\xD4NG k\u1EBFt lu\u1EADn "trang kh\xF4ng c\xF3 th\xF4ng tin" \u2014 h\xE3y g\u1ECDi browser_get_dom format=text v\u1EDBi offset=X \u0111\u1EC3 \u0111\u1ECDc ti\u1EBFp cho t\u1EDBi h\u1EBFt.
+- Ch\u1EC9 khi \u0111\xE3 \u0111\u1ECDc h\u1EBFt trang m\xE0 v\u1EABn kh\xF4ng th\u1EA5y d\u1EEF li\u1EC7u, m\u1EDBi \u0111\u01B0\u1EE3c b\xE1o l\xE0 trang kh\xF4ng hi\u1EC3n th\u1ECB th\xF4ng tin \u0111\xF3.
+
 NGUY\xCAN T\u1EAEC H\xC0NH \u0110\u1ED8NG:
 - Sau m\u1ED7i thao t\xE1c quan tr\u1ECDng (navigate, click, type), h\xE3y quan s\xE1t tr\u1EA1ng th\xE1i m\u1EDBi.
 - \u0110\u1EC3 click ho\u1EB7c g\xF5 ph\xEDm, h\xE3y s\u1EED d\u1EE5ng m\xE3 tham chi\u1EBFu ref (v\xED d\u1EE5: "@ref:1", "@ref:2"...) \u0111\u01B0\u1EE3c cung c\u1EA5p t\u1EEB browser_get_dom ho\u1EB7c quan s\xE1t.

@@ -10,6 +10,7 @@ import { browserState } from './browser-state.js';
 import { MCP_BROWSER_TOOLS } from './mcp-browser-tools.js';
 import { ALL_MCP_TOOLS, getVisibleTools, executeRegisteredTool } from './tools-registry.js';
 import { getConfig } from './config.js';
+import { formatReadProgress, sliceDocumentText } from '../shared/page-observation.js';
 
 export { MCP_BROWSER_TOOLS };
 export { ALL_MCP_TOOLS };
@@ -348,7 +349,7 @@ export class McpServerHandler {
       }
 
       case 'browser_get_dom': {
-        const { tabId, format = 'interactive_elements' } = args;
+        const { tabId, format = 'interactive_elements', offset } = args;
         const targetTab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
         if (!targetTab) throw new Error(`Tab ${tabId} not found`);
 
@@ -374,6 +375,12 @@ export class McpServerHandler {
           };
         }
 
+        // obmc-deep-read-20261107 — read-progress meta + paginated reads: the model must know
+        // what it has NOT seen (long page, still-collapsed sections) instead of assuming completeness.
+        const readOffset = Math.max(0, Math.min(Number.parseInt(String(offset ?? '0'), 10) || 0, 1_000_000));
+        const totalLen = snapshot.textTotalLength ?? (snapshot.fullText ? snapshot.fullText.length : snapshot.textExcerpt.length);
+        const readMeta = `\nTiến trình đọc: ${formatReadProgress({ read: readOffset + (format === 'text' ? sliceDocumentText(snapshot.fullText, snapshot.textExcerpt, readOffset).length : snapshot.textExcerpt.length), total: totalLen, collapsed: snapshot.collapsedControls })}\n`;
+
         if (format === 'interactive_elements') {
           const elementsList = snapshot.interactiveElements
             .map((el) => {
@@ -394,7 +401,7 @@ export class McpServerHandler {
             content: [
               {
                 type: 'text',
-                text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTrang: "${snapshot.title}"\nURL: ${snapshot.url}\n\nCác phần tử tương tác (@ref) trên trang:\n${
+                text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTrang: "${snapshot.title}"\nURL: ${snapshot.url}${readMeta}\nCác phần tử tương tác (@ref) trên trang:\n${
                   elementsList || '(Không có phần tử tương tác)'
                 }\n\n* Bạn có thể gọi tool "browser_click", "browser_type", "browser_hover", "browser_drag" bằng cách truyền tham số ref (ví dụ: ref: "@ref:1" hoặc "1").`,
               },
@@ -403,11 +410,12 @@ export class McpServerHandler {
         }
 
         if (format === 'text') {
+          const chunk = sliceDocumentText(snapshot.fullText, snapshot.textExcerpt, readOffset);
           return {
             content: [
               {
                 type: 'text',
-                text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTiêu đề: ${snapshot.title}\nURL: ${snapshot.url}\n\nNội dung văn bản:\n${snapshot.textExcerpt}`,
+                text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTiêu đề: ${snapshot.title}\nURL: ${snapshot.url}${readMeta}\nNội dung văn bản (offset ${readOffset}):\n${chunk}`,
               },
             ],
           };

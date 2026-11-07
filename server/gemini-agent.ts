@@ -152,13 +152,17 @@ const MAX_STEPS = 14;
       },
       {
         name: 'browser_get_dom',
-        description: 'Đọc danh sách các phần tử tương tác (@ref:1, @ref:2...) và cấu trúc trang web hiện tại',
+        description: 'Đọc danh sách các phần tử tương tác (@ref:1, @ref:2...) và cấu trúc trang web hiện tại. Kèm "Tiến trình đọc" (đã đọc/tổng ký tự, mục còn thu gọn): chưa đọc hết thì đừng kết luận trang thiếu thông tin — đọc tiếp bằng offset.',
         parameters: {
           type: Type.OBJECT,
           properties: {
             format: {
               type: Type.STRING,
               description: 'interactive_elements hoặc text',
+            },
+            offset: {
+              type: Type.NUMBER,
+              description: 'Vị trí ký tự bắt đầu khi đọc tiếp trang dài (mặc định 0)',
             },
           },
         },
@@ -314,6 +318,11 @@ QUY TẮC QUAN SÁT HIỆN TẠI (obmc-challenge-detect-20261107):
 - Ảnh browser_screenshot hiện chỉ là canvas mô phỏng, không phải pixel website thật. External iframe chưa hỗ trợ drag/extract; không hứa vượt captcha.
 - Khi kết thúc, trả JSON thuần: {"outcome":"completed|blocked|needs_user|failed","answer":"trả lời tiếng Việt","evidence":"trích nguyên văn ít nhất 8 ký tự từ DOM hiện tại chứng minh mục tiêu đạt được"}.
 - Chỉ chọn completed khi mục tiêu thực sự đạt được; hết bước / không gọi tool / nội dung rỗng không phải thành công.
+QUAN TRỌNG — NỘI DUNG ẨN TRÊN TRANG (obmc-deep-read-20261107):
+- Thông tin then chốt (thông số, HS Code, chi tiết nhà cung cấp) thường nằm sau nút "View More/Show more/查看更多" hoặc tải trễ. Hệ thống tự bấm các nút mở rộng này một lần sau khi trang tải.
+- Mỗi lần đọc DOM có dòng "Tiến trình đọc: đã đọc X/Y ký tự · còn mục thu gọn". Chưa đọc hết (X < Y) thì TUYỆT ĐỐI KHÔNG kết luận "trang không có thông tin" — hãy gọi browser_get_dom format=text với offset=X để đọc tiếp cho tới hết.
+- Chỉ khi đã đọc hết trang mà vẫn không thấy dữ liệu, mới được báo là trang không hiển thị thông tin đó.
+
 NGUYÊN TẮC HÀNH ĐỘNG:
 - Sau mỗi thao tác quan trọng (navigate, click, type), hãy quan sát trạng thái mới.
 - Để click hoặc gõ phím, hãy sử dụng mã tham chiếu ref (ví dụ: "@ref:1", "@ref:2"...) được cung cấp từ browser_get_dom hoặc quan sát.
