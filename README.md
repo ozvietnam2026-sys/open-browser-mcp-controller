@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.12** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Version: **4.1.13** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
@@ -19,6 +19,11 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.13 — deep read v4: sequential verified expansion (`obmc-deep-read-20261107`)
+
+- Auto-expand clicks ONE candidate at a time and verifies no navigation happened (500ms) before the next; a navigating sibling (app-promo "View More") is blacklisted by signature in sessionStorage and auto-`history.back()`ed. Batch clicking + guard used to restore the page to its pre-expand state and waste the whole pass.
+- Blacklist survives the back()/reload cycle, so repeated passes skip known-bad toggles instead of navigating again.
 
 ### v4.1.12 — deep read v3: content-reveal toggles first (`obmc-deep-read-20261107`)
 

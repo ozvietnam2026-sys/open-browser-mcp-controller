@@ -99688,23 +99688,52 @@ ${fetchRewrite}
                 return labeled.concat(strong).filter(function(n) {
                   if (seen.has(n)) return false;
                   seen.add(n);
-                  return nodeVisible(n);
+                  return nodeVisible(n) && !isBlacklisted(n);
                 });
               }
+              function nodeSignature(n) {
+                return ((typeof n.className === 'string' ? n.className : '') + '|' +
+                  (n.innerText || n.textContent || '').trim().substring(0, 40) + '|' + n.tagName);
+              }
+              function loadBlacklist() {
+                try { return JSON.parse(sessionStorage.getItem('__mcp_expand_blacklist__') || '[]'); }
+                catch (e) { return []; }
+              }
+              function isBlacklisted(n) {
+                return loadBlacklist().indexOf(nodeSignature(n)) !== -1;
+              }
+              function blacklist(n) {
+                try {
+                  var bl = loadBlacklist();
+                  bl.push(nodeSignature(n));
+                  sessionStorage.setItem('__mcp_expand_blacklist__', JSON.stringify(bl.slice(-40)));
+                } catch (e) {}
+              }
               var expandBudget = 12;
+              // v4: click ONE candidate at a time and verify no navigation happened before the next.
+              // A bad sibling (app-promo "View More" that navigates) used to trigger history.back(),
+              // which restored the page to its pre-expand state and wasted the whole pass.
               function autoExpandPass() {
-                var cands = expandCandidates().slice(0, expandBudget);
-                cands.forEach(function(node) {
-                  if (expandBudget <= 0) return;
+                var cands = expandCandidates();
+                var i = 0;
+                function step() {
+                  if (expandBudget <= 0 || i >= cands.length) return;
+                  var node = cands[i++];
+                  if (!node || !node.isConnected || isBlacklisted(node)) return step();
                   var hrefBefore = location.href;
                   expandBudget--;
-                  try { node.click(); } catch (e) { return; }
+                  try { node.click(); } catch (e) { return step(); }
                   setTimeout(function() {
                     if (location.href !== hrefBefore) {
+                      blacklist(node);
                       try { history.back(); } catch (e) {}
+                      setTimeout(step, 900); // let back() restore the document first
+                    } else {
+                      step();
                     }
-                  }, 600);
-                });
+                  }, 500);
+                }
+                step();
                 return cands.length;
               }
 
