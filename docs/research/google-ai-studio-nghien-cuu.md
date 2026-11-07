@@ -143,6 +143,16 @@ Tài khoản `gemini.wed@gmail.com` — **có gói Pro thật** (badge "Pro" c�
 | Thiết kế prompt, thử model mạnh trên UI | AI Studio tài khoản Pro (Argon mở sẵn) |
 | Argon/Pro-model qua API | Phải bật billing cho project GCP rồi tạo key trả phí — quyết định của CEO |
 
+## Phụ lục 2: cổng QA đấu vào 9Router (tối 7/11/2026 — ĐÃ CHẠY THẬT)
+
+Channel **obmc-gateway** đã tạo trên 9Router của team (`192.168.1.125:20128`, dashboard `/dashboard`):
+
+- Loại: Custom OpenAI Compatible · Chat Completions · Base URL `https://open-browser-mcp-controller-ten.vercel.app/v1`
+- Connection `obmc-team` (key = MCP token của OBMC), Check = **Valid**
+- Model có sẵn qua prefix `obmc/`: `obmc/gemini-3.5-flash`, `obmc/gemini-3.8-flash`
+- Cách agent khác gọi: `POST http://192.168.1.125:20128/v1/chat/completions` + Bearer key 9Router (vd key `obmc-chain-test`) + model `obmc/gemini-3.5-flash`
+- **Bằng chứng vòng dây** (đo 7/11): câu hỏi test → trả lời 4,6s trọn vòng (LAN→Vercel→Gemini), response id `chatcmpl-qa-mw6b6f3g-aqqol`, và bản ghi `qa-mw6b6f3g-aqqol` nằm trong kho QA của OBMC với `source: openai-compat` — tức mọi lượt hỏi qua 9Router đều **tự lưu** về OBMC để tra lại bằng `/api/qa/:id`.
+
 ## Nguồn
 
 - Giao diện sống `aistudio.google.com` phiên `ceo@ngantin.vn`, 7/11/2026 (mọi mục ✅).
