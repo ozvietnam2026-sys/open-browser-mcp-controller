@@ -59,12 +59,9 @@ Vite + React UI + Express MCP server. Agents can:
 - **Paginated reads**: snapshots now carry `fullText` (bounded 64KB) + `textTotalLength`; `browser_get_dom` accepts `offset` to page through long documents instead of the old hard 2.000-char cut.
 - Agent prompt rule added: hidden/lazy content is expected on marketplace pages — expand, page through, and only then conclude.
 
-### Open items from the 2026-11-07 HS-code session (for v4.1.14+)
+### HS-code session verdict (2026-11-07, closed for heuristics)
 
-- Made-in-China product attrs (HS Code row) still does not auto-reveal end-to-end despite v2–v4 heuristics. Two named hypotheses to verify with server-side logging in `autoExpandPass` (clicks performed, blacklist entries, href before/after):
-  1. **Shadow DOM**: expanded attrs may hydrate inside a shadow root — `document.body.innerText` and `querySelectorAll` do not pierce shadow roots, so content can be visible to a human but invisible to every scan.
-  2. **Hash-change misdetection**: an expand that updates `location.hash` flips `location.href`, gets misread as navigation, and the toggle lands in the blacklist + `history.back()` resets the page.
-- Verification environment friction (both known): SSE drop after deploys → `UI disconnected` until the app tab is reloaded; shared singleton `browserState` resets `tab-1` mid-run (one pilot at a time).
+The expand machinery is now correct and provable: content-region-only candidates, one click per toggle per load, post-hydration timing, navigation-guarded with blacklist — the `expandLog` trail in `browser_get_dom` shows `product-attrs-toggle` clicked exactly once, verified non-navigating. The HS Code rows STILL do not appear in the DOM text. Combined with the raw-HTML evidence (rows absent from the 247KB source, `data-collapse-count="5"` static section), the remaining suspect is an **`isTrusted`-gated XHR**: the attrs fetch appears to fire only for real user clicks (manual click in the pane shows the rows; every synthetic route — `node.click()` included — produces `isTrusted: false`, which the platform forbids faking). This is not solvable by more in-page heuristics; the correct product path is the human-assist flow (research item #6: needs_user + Continue button / MCP elicitation), where the user taps the toggle and the agent reads the result. The shadow-DOM and hash-misdetection hypotheses from 4.1.13 are ruled out by the v5/v6 trails.
 
 ### v4.1.9 — navigation wait re-bind + final-answer format nudge (`obmc-nav-wait-20261107`, `obmc-final-nudge-20261107`)
 
