@@ -63,6 +63,19 @@ agent bất kỳ → OBMC trên .131:3100 (MCP, token team) → hầm CDP có s�
 3. Anh/mina **deploy OBMC Docker lên VPS đó** + đăng nhập gemini.wed lần đầu qua live view.
 4. Tuỳ chọn: cron keep-alive + thêm profile cho các tài khoản dự phòng.
 
+### Phát hiện mới: DeepSeek qua CDP nhanh nhất hệ thống (tối 7/11)
+
+Dùng OBMC pw_* / CDP trực tiếp điều khiển Chrome Windows (đăng nhập sẵn), gửi prompt vào **chat DeepSeek** và đo:
+
+| Đường | Thời gian |
+|---|---|
+| **DeepSeek UI qua CDP** | **1,0s** 🏆 MIỄN PHÍ |
+| OBMC API flash-lite | 1,2-2,2s |
+| 9Router → OBMC flash-lite | 1,45s |
+| Kimi K3.1 Pro UI | cần thao tác tay (rich-text editor chống automation) |
+
+**Khuyến nghị:** DeepSeek nên thành kênh default cho câu hỏi thường ngày qua 9Router (nếu có API) hoặc qua CDP browser 24/7.
+
 ## Số đo nền (đo thực 7/11/2026)
 
 | Đường | Thời gian |
