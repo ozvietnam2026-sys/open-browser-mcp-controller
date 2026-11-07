@@ -40,6 +40,22 @@ Mục tiêu: phiên đăng nhập **app Gemini của `gemini.wed`** sống liên
 - **OBMC Vercel chết** → 9Router trỏ channel sang OBMC bản VPS (lớp 2) hoặc kênh khác.
 - **Mất hết Google** → 9Router fallback kênh khác (đã có).
 
+## ✅ Lớp 2 ĐÃ DỰNG THẬT (tối 7/11/2026) — kiến trúc thực tế khác bản thiết kế Docker
+
+Không cần Docker trên Windows (tôn trọng giới hạn 8GB RAM). Chuỗi thực tế đã chạy và verified:
+
+```
+agent bất kỳ → OBMC trên .131:3100 (MCP, token team) → hầm CDP có sẵn .131:9222
+            → Chrome Windows (tác vụ oz-chrome-cdp, hồ sơ C:\oz-chrome, phiên Google sống)
+            → gemini.google.com (IP VN không cản web app — API vẫn đi Vercel như cũ)
+```
+
+- OBMC triển khai tại `~/obmc-247` trên .131 (`oz@192.168.1.131`), env `ENABLE_PLAYWRIGHT=1`, `CDP_BROWSER_URL=http://127.0.0.1:9222`, PORT 3100.
+- Cron trên .131: `@reboot` tự dậy + `*/20` phút keep-alive (复活 OBMC nếu chết + `pw_navigate` chạm Gemini giữ cookie Google).
+- Verified: `pw_snapshot`/`pw_navigate` điều khiển Chrome Windows từ xa; tab Gemini mở trong phiên.
+- **Còn 1 bước bàn tay người (RDP, ~2 phút, MỘT LẦN):** trong Chrome Windows, avatar → **Thêm tài khoản khác** → đăng nhập `gemini.wed@gmail.com` + 2FA + **Duy trì đăng nhập** → sau đó ghim mặc định bằng URL `?authuser=N` (em sẽ xác định N và cấu hình). Hiện hồ sơ chỉ có `ceo@ngantin.vn` (session này vẫn dùng được app Gemini).
+- Nguyên tắc bảo mật phiên (theo răn dạy CEO): không Sign out Windows (chỉ ngắt RDP), không đăng xuất hồ sơ Chrome, không mở Chrome ngoài tác vụ `oz-chrome-cdp`.
+
 ## Ma trận quyết định cho anh
 
 1. **Chọn VPS** cho lớp 2 (đề xuất: vps-201 hoặc vps-202 — đã có key 9Router kết nối, chắc ngoài VN; cần xác nhận egress).
