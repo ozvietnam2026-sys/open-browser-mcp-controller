@@ -18,7 +18,7 @@ describe('proxy-url rewrite helper', () => {
       controller
     );
     assert.equal(r.shouldRewrite, true);
-    assert.ok(r.proxiedUrl?.startsWith(`${PROXY_PATH}?url=`));
+    assert.ok(r.proxiedUrl?.startsWith(`${controller}${PROXY_PATH}?url=`));
     assert.ok(r.proxiedUrl?.includes(encodeURIComponent('https://h5api.taobao.com')));
   });
 
@@ -91,5 +91,33 @@ describe('proxy-url rewrite helper', () => {
     assert.equal(headers.Authorization, undefined);
     assert.equal(headers.host, undefined);
     assert.equal(headers['content-length'], undefined);
+  });
+});
+
+describe('proxy-url <base href> handling (obmc-proxy-basehref-20261107)', () => {
+  const controller = 'https://open-browser-mcp-controller-ten.vercel.app';
+  const taobaoBase = 'https://www.taobao.com/';
+
+  test('h5api URL → absolute proxied URL on controller origin', () => {
+    const target = 'https://h5api.m.taobao.com/h5/mtop.relationrecommend.wirelessrecommend.recommend/2.0/?a=1';
+    const r = resolveProxyRewrite(target, taobaoBase, controller);
+    assert.equal(r.shouldRewrite, true);
+    assert.equal(r.proxiedUrl, `${controller}${PROXY_PATH}?url=${encodeURIComponent(target)}`);
+    assert.equal(new URL(r.proxiedUrl!).origin, controller);
+  });
+
+  test('path /api/browser/proxy mis-resolved against taobao base → corrected to controller', () => {
+    const q = `?url=${encodeURIComponent('https://h5api.m.taobao.com/x')}`;
+    const r = resolveProxyRewrite(`${PROXY_PATH}${q}`, taobaoBase, controller);
+    assert.equal(r.resolvedHref.startsWith('https://www.taobao.com/'), true);
+    assert.equal(r.shouldRewrite, true);
+    assert.equal(r.proxiedUrl, `${controller}${PROXY_PATH}${q}`);
+  });
+
+  test('data: and same-origin controller URLs not rewritten', () => {
+    assert.equal(resolveProxyRewrite('data:text/plain,hi', taobaoBase, controller).shouldRewrite, false);
+    for (const p of ['/api/mcp', '/api/agent', '/api/browser/events']) {
+      assert.equal(resolveProxyRewrite(`${controller}${p}`, taobaoBase, controller).shouldRewrite, false);
+    }
   });
 });

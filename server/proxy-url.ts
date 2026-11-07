@@ -46,14 +46,18 @@ export function resolveProxyRewrite(
     return { shouldRewrite: false, resolvedHref: href };
   }
 
-  // Avoid double-wrapping URLs that already go through the proxy
-  if (
-    resolved.pathname === PROXY_PATH ||
-    resolved.pathname.startsWith(`${PROXY_PATH}/`) ||
-    href.includes('/api/browser/proxy?') ||
-    href.includes('/api/browser/proxy&')
-  ) {
-    return { shouldRewrite: false, resolvedHref: href };
+  const isProxyPath =
+    resolved.pathname === PROXY_PATH || resolved.pathname.startsWith(`${PROXY_PATH}/`);
+
+  if (isProxyPath) {
+    // Already correctly proxied on the controller origin: leave alone.
+    if (resolved.origin === controllerOrigin) {
+      return { shouldRewrite: false, resolvedHref: href };
+    }
+    // Mis-resolved against <base href> (e.g. https://www.taobao.com/api/browser/proxy?...):
+    // send it back to the controller origin, keeping the existing query.
+    const proxiedUrl = `${controllerOrigin}${PROXY_PATH}${resolved.search}`;
+    return { shouldRewrite: true, resolvedHref: href, proxiedUrl };
   }
 
   // Same-origin controller paths (/api/mcp, /api/agent, /api/browser/events, …) stay direct
@@ -61,7 +65,8 @@ export function resolveProxyRewrite(
     return { shouldRewrite: false, resolvedHref: href };
   }
 
-  const proxiedUrl = `${PROXY_PATH}?url=${encodeURIComponent(href)}`;
+  // Must be absolute: a path-absolute URL would resolve against <base href> (the real site).
+  const proxiedUrl = `${controllerOrigin}${PROXY_PATH}?url=${encodeURIComponent(href)}`;
   return { shouldRewrite: true, resolvedHref: href, proxiedUrl };
 }
 
@@ -156,10 +161,13 @@ export function buildFetchRewriteSnippet(): string {
                       return null;
                     }
                     if (protocol !== 'http:' && protocol !== 'https:') return null;
-                    if (resolved.pathname === PROXY_PATH || resolved.pathname.indexOf(PROXY_PATH + '/') === 0) return null;
-                    if (String(resolved.href).indexOf('/api/browser/proxy?') !== -1) return null;
+                    if (resolved.pathname === PROXY_PATH || resolved.pathname.indexOf(PROXY_PATH + '/') === 0) {
+                      if (resolved.origin === controllerOrigin) return null;
+                      // Mis-resolved against <base href>: send back to controller origin.
+                      return controllerOrigin + PROXY_PATH + resolved.search;
+                    }
                     if (resolved.origin === controllerOrigin) return null;
-                    return PROXY_PATH + '?url=' + encodeURIComponent(resolved.href);
+                    return controllerOrigin + PROXY_PATH + '?url=' + encodeURIComponent(resolved.href);
                   } catch (e) {
                     return null;
                   }

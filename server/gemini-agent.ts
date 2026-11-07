@@ -13,6 +13,15 @@ import { AgentStep } from '../shared/browser-types.js';
  * Environment-aware copy when GEMINI_API_KEY is missing.
  * Never includes a real key value.
  */
+/** Anti-hallucination rule for price/supplier tasks (exported for tests). */
+export const PRICE_GROUNDING_RULES = `
+QUY TẮC GIÁ — CHỈ DÙNG DỮ LIỆU THẬT TRÊN TRANG (BẮT BUỘC):
+- Chỉ báo giá/nhà cung cấp khi giá đó THỰC SỰ xuất hiện trong nội dung trang đã trích xuất (browser_extract_content, browser_get_dom). Mỗi mức giá phải kèm URL nguồn.
+- Nếu trích xuất rỗng / không có danh sách sản phẩm, hoặc trang bị chặn bởi captcha, mã QR xác minh, tường đăng nhập (ví dụ "亲，请登录", "Please try again"), hoặc kết quả tìm kiếm bị chặn: TUYỆT ĐỐI KHÔNG bịa, KHÔNG nhớ lại từ kiến thức sẵn có và KHÔNG đưa ra "giá tham khảo", "khoảng giá thị trường" hay "giá điển hình".
+- Trong trường hợp đó, hãy nói rõ: không đọc được danh sách sản phẩm từ trang hiện tại, mô tả trở ngại (cần đăng nhập / xác minh QR / captcha) kèm URL, và gợi ý người dùng đăng nhập hoặc vượt xác minh rồi thử lại.
+- Ưu tiên ở lại website thật mà người dùng đang mở; được phép tìm kiếm trên chính website đó.
+`;
+
 export function getMissingGeminiKeyMessage(env: NodeJS.ProcessEnv = process.env): string {
   if (env.VERCEL) {
     return 'Chưa cấu hình GEMINI_API_KEY. Trên Vercel: Project Settings → Environment Variables, thêm GEMINI_API_KEY cho Production/Preview, rồi Redeploy.';
@@ -218,7 +227,7 @@ const MAX_STEPS = 14;
           type: Type.OBJECT,
           properties: {
             mode: { type: Type.STRING, description: 'structured, table, links, hoặc full_text' },
-            query: { type: Type.STRING, description: 'Phạm vi cần trích xuất' },
+            query: { type: Type.STRING, description: 'Phạm vi cần trích xuất. Nếu kết quả không chứa giá/sản phẩm thật (rỗng, captcha, đăng nhập) thì KHÔNG được tự bịa giá.' },
           },
         },
       },
@@ -241,6 +250,7 @@ QUAN TRỌNG — TRANG WEB THẬT:
 - NovaTech Store chỉ là trang test mặc định — không dùng nó thay cho Taobao/1688 hay bất kỳ nhà cung cấp thật nào.
 - Chỉ mở trang mẫu browser:// khi người dùng nêu rõ tên trang demo, hoặc khi tab hiện tại vốn đã là trang mẫu và nhiệm vụ thuộc về trang đó.
 
+${PRICE_GROUNDING_RULES}
 NGUYÊN TẮC HÀNH ĐỘNG:
 - Sau mỗi thao tác quan trọng (navigate, click, type), hãy quan sát trạng thái mới.
 - Để click hoặc gõ phím, hãy sử dụng mã tham chiếu ref (ví dụ: "@ref:1", "@ref:2"...) được cung cấp từ browser_get_dom hoặc quan sát.
