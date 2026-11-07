@@ -118821,38 +118821,77 @@ function validatePromptRunRequest(body) {
 function promptModelCascade(env = process.env) {
   return [env.GEMINI_MODEL, "gemini-3.5-flash", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-flash-latest"].filter(Boolean);
 }
+function parseApiKeys(env = process.env) {
+  const keys = [];
+  const seen = /* @__PURE__ */ new Set();
+  const add2 = (v) => {
+    const t2 = typeof v === "string" ? v.trim() : "";
+    if (t2 && !seen.has(t2)) {
+      seen.add(t2);
+      keys.push(t2);
+    }
+  };
+  if (typeof env.GEMINI_API_KEYS === "string") env.GEMINI_API_KEYS.split(/[,\s]+/).forEach(add2);
+  add2(env.GEMINI_API_KEY);
+  for (let i2 = 2; i2 <= 9; i2++) add2(env["GEMINI_API_KEY_" + i2]);
+  return keys;
+}
+function isQuotaError(message) {
+  return /429|RESOURCE_EXHAUSTED|quota|rate ?limit|exceeded/i.test(String(message || ""));
+}
+var lastGoodKeySlot = 0;
 async function runPrompt(prompt, opts = {}) {
   const env = opts.env ?? process.env;
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) return { model: "", text: "", timingMs: 0, error: getMissingGeminiKeyMessage(env) };
+  const apiKeys = parseApiKeys(env);
+  if (apiKeys.length === 0) {
+    return { model: "", text: "", timingMs: 0, error: getMissingGeminiKeyMessage(env) };
+  }
   const models = opts.model ? [opts.model] : promptModelCascade(env);
-  const ai = new GoogleGenAI({
-    apiKey,
-    httpOptions: { headers: { "User-Agent": "aistudio-build" } }
-  });
-  const { thinkingLevel, maxOutputTokens, systemInstructions } = opts.options ?? {};
-  const config = {};
-  if (maxOutputTokens) config.maxOutputTokens = maxOutputTokens;
-  if (systemInstructions) config.systemInstruction = systemInstructions;
-  if (thinkingLevel) config.thinkingConfig = { thinkingLevel };
-  const useConfig = Object.keys(config).length > 0;
   const started = Date.now();
   let lastError;
-  for (const model of models) {
-    try {
-      const response = await ai.models.generateContent(
-        useConfig ? { model, contents: prompt, config } : { model, contents: prompt }
-      );
-      const text3 = (response.candidates?.[0]?.content?.parts ?? []).map((p) => p.text || "").join("").trim();
-      if (!text3) throw new Error("Empty response from " + model);
-      return { model, text: text3, timingMs: Date.now() - started, config: useConfig ? config : void 0 };
-    } catch (err) {
-      lastError = err;
-      if (/404|429|503|high demand|no longer available|not found/i.test(String(err?.message || err))) continue;
-      break;
+  let keySlotUsed = 0;
+  for (let k = 0; k < apiKeys.length; k++) {
+    const slot = (lastGoodKeySlot + k) % apiKeys.length;
+    const ai = new GoogleGenAI({
+      apiKey: apiKeys[slot],
+      httpOptions: { headers: { "User-Agent": "aistudio-build" } }
+    });
+    const { thinkingLevel, maxOutputTokens, systemInstructions } = opts.options ?? {};
+    const config = {};
+    if (maxOutputTokens) config.maxOutputTokens = maxOutputTokens;
+    if (systemInstructions) config.systemInstruction = systemInstructions;
+    if (thinkingLevel) config.thinkingConfig = { thinkingLevel };
+    const useConfig = Object.keys(config).length > 0;
+    for (const model of models) {
+      try {
+        const response = await ai.models.generateContent(
+          useConfig ? { model, contents: prompt, config } : { model, contents: prompt }
+        );
+        const text3 = (response.candidates?.[0]?.content?.parts ?? []).map((p) => p.text || "").join("").trim();
+        if (!text3) throw new Error("Empty response from " + model);
+        lastGoodKeySlot = slot;
+        keySlotUsed = slot;
+        return { model, text: text3, timingMs: Date.now() - started, config: useConfig ? config : void 0, keySlot: `${slot + 1}/${apiKeys.length}` };
+      } catch (err) {
+        lastError = err;
+        if (/404|429|503|high demand|no longer available|not found/i.test(String(err?.message || err))) continue;
+        break;
+      }
     }
+    if (isQuotaError(String(lastError?.message || lastError)) && k < apiKeys.length - 1) {
+      lastGoodKeySlot = (slot + 1) % apiKeys.length;
+      continue;
+    }
+    break;
   }
-  return { model: models[0], text: "", timingMs: Date.now() - started, error: String(lastError?.message || lastError) };
+  const result = {
+    model: models[0],
+    text: "",
+    timingMs: Date.now() - started,
+    error: String(lastError?.message || lastError),
+    keySlot: `${keySlotUsed + 1}/${apiKeys.length}`
+  };
+  return result;
 }
 
 // server.ts

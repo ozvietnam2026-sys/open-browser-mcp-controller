@@ -12,6 +12,8 @@ export interface PromptRunResult {
   text: string;
   timingMs: number;
   config?: Record<string, unknown>;
+  /** obmc-key-rotation-20261107 — masked slot in use, e.g. 2/3 (never the key itself). */
+  keySlot?: string;
   error?: string;
 }
 
@@ -75,22 +77,55 @@ export function promptModelCascade(env: NodeJS.ProcessEnv = process.env): string
     .filter(Boolean) as string[];
 }
 
+/**
+ * obmc-key-rotation-20261107 — API key pool for daily-quota rotation.
+ * Sources (deduped, order preserved): GEMINI_API_KEYS="k1,k2,k3" · GEMINI_API_KEY · GEMINI_API_KEY_2..9.
+ * On a quota error (429/RESOURCE_EXHAUSTED) the caller rotates to the next key.
+ */
+export function parseApiKeys(env: NodeJS.ProcessEnv = process.env): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+  const add = (v: unknown) => {
+    const t = typeof v === 'string' ? v.trim() : '';
+    if (t && !seen.has(t)) { seen.add(t); keys.push(t); }
+  };
+  if (typeof env.GEMINI_API_KEYS === 'string') env.GEMINI_API_KEYS.split(/[,\s]+/).forEach(add);
+  add(env.GEMINI_API_KEY);
+  for (let i = 2; i <= 9; i++) add(env['GEMINI_API_KEY_' + i]);
+  return keys;
+}
+
+export function isQuotaError(message: string | undefined | null): boolean {
+  return /429|RESOURCE_EXHAUSTED|quota|rate ?limit|exceeded/i.test(String(message || ''));
+}
+
+/** Sticky slot: remember the last healthy key so steady-state traffic skips exhausted keys. */
+let lastGoodKeySlot = 0;
+
 export async function runPrompt(
   prompt: string,
   opts: { model?: string; options?: PromptRunOptions; env?: NodeJS.ProcessEnv } = {}
 ): Promise<PromptRunResult> {
   const env = opts.env ?? process.env;
-  const apiKey = env.GEMINI_API_KEY;
-  if (!apiKey) return { model: '', text: '', timingMs: 0, error: getMissingGeminiKeyMessage(env) };
+  const apiKeys = parseApiKeys(env);
+  if (apiKeys.length === 0) {
+    return { model: '', text: '', timingMs: 0, error: getMissingGeminiKeyMessage(env) };
+  }
 
   const models = opts.model ? [opts.model] : promptModelCascade(env);
-  const ai = new GoogleGenAI({
-    apiKey,
-    httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
-  });
 
-  // obmc-prompt-api-20261107 — mirrors AI Studio "Get code": max_output_tokens, thinking_level,
-  // system instructions — same names the SDK typings use (ThinkingLevel minimal|low|medium|high).
+  // obmc-key-rotation-20261107 — on a daily-quota/429 exhaustion the whole key slot is skipped
+  // for this request and the sticky pointer moves on; non-quota errors keep the old cascade behavior.
+  const started = Date.now();
+  let lastError: any;
+  let keySlotUsed = 0;
+  for (let k = 0; k < apiKeys.length; k++) {
+    const slot = (lastGoodKeySlot + k) % apiKeys.length;
+    const ai = new GoogleGenAI({
+      apiKey: apiKeys[slot],
+      httpOptions: { headers: { 'User-Agent': 'aistudio-build' } },
+    });
+
   const { thinkingLevel, maxOutputTokens, systemInstructions } = opts.options ?? {};
   const config: Record<string, unknown> = {};
   if (maxOutputTokens) config.maxOutputTokens = maxOutputTokens;
@@ -98,8 +133,6 @@ export async function runPrompt(
   if (thinkingLevel) config.thinkingConfig = { thinkingLevel };
   const useConfig = Object.keys(config).length > 0;
 
-  const started = Date.now();
-  let lastError: any;
   for (const model of models) {
     try {
       const response = await ai.models.generateContent(
@@ -110,12 +143,28 @@ export async function runPrompt(
         .join('')
         .trim();
       if (!text) throw new Error('Empty response from ' + model);
-      return { model, text, timingMs: Date.now() - started, config: useConfig ? config : undefined };
+      lastGoodKeySlot = slot;
+      keySlotUsed = slot;
+      return { model, text, timingMs: Date.now() - started, config: useConfig ? config : undefined, keySlot: `${slot + 1}/${apiKeys.length}` };
     } catch (err: any) {
       lastError = err;
       if (/404|429|503|high demand|no longer available|not found/i.test(String(err?.message || err))) continue;
       break;
     }
   }
-  return { model: models[0], text: '', timingMs: Date.now() - started, error: String(lastError?.message || lastError) };
+  // Quota death on this slot → rotate to the next key and retry the whole cascade once there.
+  if (isQuotaError(String(lastError?.message || lastError)) && k < apiKeys.length - 1) {
+    lastGoodKeySlot = (slot + 1) % apiKeys.length;
+    continue;
+  }
+  break;
+  }
+  const result: PromptRunResult = {
+    model: models[0],
+    text: '',
+    timingMs: Date.now() - started,
+    error: String(lastError?.message || lastError),
+    keySlot: `${keySlotUsed + 1}/${apiKeys.length}`,
+  };
+  return result;
 }
