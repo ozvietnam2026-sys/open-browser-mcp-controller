@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { matchesDocument, iframeCommandError } from '../../shared/challenge-state';
 import { buildDragPath } from '../../shared/drag-path';
 import { BuiltInPages } from './BuiltInPages';
 import {
@@ -21,6 +22,7 @@ interface BrowserViewportProps {
   url: string;
   /** Bumped by App on Reload to remount the proxied iframe. */
   reloadNonce?: number;
+  navigationId?: number;
   onNavigate: (url: string) => void;
   onTitleChange: (title: string) => void;
   showInspectorOverlay: boolean;
@@ -34,6 +36,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
   activeTabId,
   url,
   reloadNonce = 0,
+  navigationId = 0,
   onNavigate,
   onTitleChange,
   showInspectorOverlay,
@@ -157,7 +160,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
         fetch('/api/browser/screenshot', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tabId: activeTabId, dataUrl }),
+          body: JSON.stringify({ tabId: activeTabId, url, navigationId, dataUrl }),
         }).catch(() => {});
         return dataUrl;
       }
@@ -165,7 +168,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
       console.error('Screenshot error:', e);
     }
     return '';
-  }, [activeTabId, pageTitle, url]);
+  }, [activeTabId, pageTitle, url, navigationId]);
 
   const onSnapshotUpdatedRef = useRef(onSnapshotUpdated);
   const onTitleChangeRef = useRef(onTitleChange);
@@ -257,6 +260,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
       ? containerRef.current.innerText.substring(0, 2000)
       : '';
     const snapshot: DomSnapshot = {
+      tabId: activeTabId, navigationId,
       url,
       title: pageTitleRef.current,
       interactiveElements: scanned,
@@ -284,7 +288,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
 
     onSnapshotUpdatedRef.current?.(snapshot);
 
-    const fingerprint = `${snapshot.url}|${snapshot.title}|${scanned.length}|${textExcerpt.length}`;
+    const fingerprint = `${activeTabId}:${navigationId}|${snapshot.url}|${snapshot.title}|${scanned.length}|${textExcerpt.length}`;
     if (fingerprint === lastPostedFingerprintRef.current) return;
     lastPostedFingerprintRef.current = fingerprint;
 
@@ -293,7 +297,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tabId: activeTabIdRef.current, snapshot }),
     }).catch(() => {});
-  }, [url]);
+  }, [url, activeTabId, navigationId]);
 
   const scheduleScan = useCallback(() => {
     if (scanTimerRef.current) clearTimeout(scanTimerRef.current);
@@ -322,16 +326,18 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
       const data = e.data;
-      if (!data) return;
+      if (!data || e.source !== iframeRef.current?.contentWindow) return;
+      const currentDocument = { id: activeTabId, url, navigationId } as any;
 
       if (data.type === 'MCP_DOM_SNAPSHOT' && data.snapshot) {
+        if (!matchesDocument(currentDocument, data.snapshot)) return;
         const els = data.snapshot.interactiveElements || [];
         setElements(els);
         setPageTitle(data.snapshot.title || 'Trang web');
         onTitleChange(data.snapshot.title || 'Trang web');
         onSnapshotUpdated?.(data.snapshot);
 
-        const fingerprint = `${data.snapshot.url}|${data.snapshot.title}|${els.length}|${(data.snapshot.textExcerpt || '').length}`;
+        const fingerprint = `${activeTabId}:${navigationId}|${data.snapshot.url}|${data.snapshot.title}|${els.length}|${(data.snapshot.textExcerpt || '').length}`;
         if (fingerprint === lastPostedFingerprintRef.current) return;
         lastPostedFingerprintRef.current = fingerprint;
 
@@ -347,6 +353,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
       }
 
       if (data.type === 'MCP_COMMAND_COMPLETED') {
+        if (!matchesDocument(currentDocument, data.identity)) return;
         fetch('/api/browser/command-result', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -357,7 +364,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [activeTabId, onNavigate, onTitleChange, onSnapshotUpdated]);
+  }, [activeTabId, url, navigationId, onNavigate, onTitleChange, onSnapshotUpdated]);
 
   // Execute MCP command locally on the viewport
   const executeLocalCommand = useCallback(
@@ -751,8 +758,10 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             commandId: cmd.id,
-            success: true,
+            success: !!text.trim(),
+            error: text.trim() ? undefined : 'Empty extract; no listing evidence',
             data: {
+              tabId: activeTabId, navigationId,
               title: pageTitle,
               url,
               excerpt: text,
@@ -831,7 +840,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
         }
       }
     },
-    [scanBuiltInElements, captureViewportScreenshot, pageTitle, url]
+    [scanBuiltInElements, captureViewportScreenshot, pageTitle, url, activeTabId, navigationId]
   );
 
   // Listen for execute_command via singleton sseClient
@@ -841,6 +850,18 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
         if (!cmd) return;
         if (cmd.tabId && cmd.tabId !== activeTabIdRef.current) return;
 
+        const reject = (error: string) => fetch('/api/browser/command-result', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ commandId: cmd.id, success: false, error }),
+        }).catch(() => {});
+        if (!matchesDocument({ id: activeTabId, url, navigationId } as any,
+          { tabId: cmd.tabId, url: cmd.url, navigationId: cmd.navigationId })) {
+          reject('Stale command: viewport document mismatch'); return;
+        }
+        if (!isBuiltInRef.current) {
+          const error = iframeCommandError(cmd.type);
+          if (error) { reject(error); return; }
+        }
         if (isBuiltInRef.current) {
           executeLocalCommand(cmd);
         } else if (iframeRef.current && iframeRef.current.contentWindow) {
@@ -889,9 +910,9 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
     return () => {
       unsubscribe();
     };
-  }, [executeLocalCommand]);
+  }, [executeLocalCommand, activeTabId, url, navigationId]);
 
-  const proxyUrl = `/api/browser/proxy?url=${encodeURIComponent(url)}&tabId=${activeTabId}`;
+  const proxyUrl = `/api/browser/proxy?url=${encodeURIComponent(url)}&tabId=${activeTabId}&navigationId=${navigationId}`;
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-slate-900 select-text">
@@ -909,7 +930,7 @@ export const BrowserViewport: React.FC<BrowserViewportProps> = ({
           />
         ) : (
           <iframe
-            key={`${activeTabId}:${url}:${reloadNonce}`}
+            key={`${activeTabId}:${url}:${navigationId}:${reloadNonce}`}
             ref={iframeRef}
             src={`${proxyUrl}&_r=${reloadNonce}`}
             title={pageTitle}

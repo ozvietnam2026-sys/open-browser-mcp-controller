@@ -15,6 +15,7 @@ import {
   NetworkLogEntry,
   McpLogItem,
 } from '../shared/browser-types.js';
+import { matchesDocument, classifyChallenge, iframeCommandError, type DocumentIdentity } from '../shared/challenge-state.js';
 import { truncateForLog, urlsEquivalent } from '../shared/browser-session.js';
 
 const MAX_HISTORY = 40;
@@ -30,7 +31,7 @@ class BrowserStateManager {
   private consoleLogs: ConsoleLogEntry[] = [];
   private networkLogs: NetworkLogEntry[] = [];
   private mcpLogs: McpLogItem[] = [];
-  private screenshotCache: Map<string, string> = new Map();
+  private screenshotCache: Map<string, DocumentIdentity & { dataUrl: string; simulated: true }> = new Map();
 
   // SSE client connections for frontend UI synchronization
   private uiEventClients: Set<(event: string, data: any) => void> = new Set();
@@ -42,6 +43,7 @@ class BrowserStateManager {
       resolve: (result: BrowserCommandResult) => void;
       reject: (err: any) => void;
       timer: NodeJS.Timeout;
+      command: BrowserCommand;
     }
   > = new Map();
 
@@ -60,6 +62,7 @@ class BrowserStateManager {
       canGoForward: false,
       history: ['browser://search'],
       historyIndex: 0,
+      navigationId: 0,
       lastUpdated: Date.now(),
     };
     this.tabs.set(defaultTab.id, defaultTab);
@@ -81,11 +84,19 @@ class BrowserStateManager {
             url: snap.url,
             elementCount: snap.interactiveElements?.length || 0,
             timestamp: snap.timestamp,
+            navigationId: snap.navigationId,
           }
         : null,
     });
     return () => {
       this.uiEventClients.delete(client);
+      if (this.uiEventClients.size === 0) {
+        for (const [id, pending] of this.pendingCommands) {
+          clearTimeout(pending.timer);
+          pending.resolve({ commandId: id, success: false, error: 'UI disconnected; execution unconfirmed' });
+        }
+        this.pendingCommands.clear();
+      }
     };
   }
 
@@ -155,6 +166,7 @@ class BrowserStateManager {
       canGoForward: false,
       history: [url],
       historyIndex: 0,
+      navigationId: 0,
       lastUpdated: Date.now(),
     };
     this.tabs.set(id, newTab);
@@ -171,6 +183,7 @@ class BrowserStateManager {
       // Don't close the very last tab, just reset it
       const current = this.tabs.get(tabId);
       if (current) {
+        this.invalidateDocument(current);
         current.url = 'browser://search';
         current.title = 'AeroSearch - Tìm kiếm thông minh';
         current.history = ['browser://search'];
@@ -213,7 +226,9 @@ class BrowserStateManager {
   public updateTab(tabId: string, updates: Partial<BrowserTab>) {
     const tab = this.tabs.get(tabId);
     if (!tab) return;
-    Object.assign(tab, updates);
+    if (updates.url && !urlsEquivalent(tab.url, updates.url)) this.invalidateDocument(tab);
+    const { navigationId: _ignored, ...safeUpdates } = updates;
+    Object.assign(tab, safeUpdates);
     tab.lastUpdated = Date.now();
     this.broadcast('tabs_updated', {
       tabs: this.getAllTabs(),
@@ -246,6 +261,7 @@ class BrowserStateManager {
       return tab;
     }
 
+    this.invalidateDocument(tab);
     tab.url = cleanUrl;
     tab.isLoading = true;
 
@@ -275,6 +291,7 @@ class BrowserStateManager {
   public historyBack(tabId?: string): boolean {
     const tab = tabId ? this.tabs.get(tabId) : this.getActiveTab();
     if (!tab || tab.historyIndex <= 0) return false;
+    this.invalidateDocument(tab);
     tab.historyIndex--;
     tab.url = tab.history[tab.historyIndex];
     tab.canGoBack = tab.historyIndex > 0;
@@ -287,6 +304,7 @@ class BrowserStateManager {
   public historyForward(tabId?: string): boolean {
     const tab = tabId ? this.tabs.get(tabId) : this.getActiveTab();
     if (!tab || tab.historyIndex >= tab.history.length - 1) return false;
+    this.invalidateDocument(tab);
     tab.historyIndex++;
     tab.url = tab.history[tab.historyIndex];
     tab.canGoBack = tab.historyIndex > 0;
@@ -296,10 +314,27 @@ class BrowserStateManager {
     return true;
   }
 
+  private invalidateDocument(tab: BrowserTab) {
+    tab.navigationId = (tab.navigationId ?? 0) + 1;
+    tab.title = 'Đang tải trang…';
+    tab.isLoading = true;
+    this.domSnapshots.delete(tab.id);
+    this.screenshotCache.delete(tab.id);
+  }
+
+  public reloadTab(tabId: string) {
+    const tab = this.tabs.get(tabId);
+    if (!tab) return;
+    this.invalidateDocument(tab);
+    this.broadcast('tab_navigated', { tabId, tab });
+  }
+
   // DOM Snapshot Management
   public setDomSnapshot(tabId: string, snapshot: DomSnapshot) {
-    this.domSnapshots.set(tabId, snapshot);
     const tab = this.tabs.get(tabId);
+    if (!tab || !matchesDocument(tab, snapshot) || !Array.isArray(snapshot.interactiveElements) ||
+      typeof snapshot.textExcerpt !== 'string' || typeof snapshot.simplifiedTree !== 'string') return false;
+    this.domSnapshots.set(tabId, snapshot);
     let titleChanged = false;
     if (tab) {
       const nextTitle = snapshot.title || tab.title;
@@ -322,28 +357,37 @@ class BrowserStateManager {
         url: snapshot.url,
         elementCount: snapshot.interactiveElements?.length || 0,
         timestamp: snapshot.timestamp,
+        navigationId: snapshot.navigationId,
       },
     });
+    return true;
   }
 
   public getDomSnapshot(tabId?: string): DomSnapshot | undefined {
     const targetId = tabId || this.activeTabId;
-    return this.domSnapshots.get(targetId);
+    const tab = this.tabs.get(targetId);
+    const snapshot = this.domSnapshots.get(targetId);
+    return tab && matchesDocument(tab, snapshot) ? snapshot : undefined;
   }
 
-  public setScreenshot(tabId: string, base64DataUrl: string) {
-    this.screenshotCache.set(tabId, base64DataUrl);
+  public setScreenshot(tabId: string, base64DataUrl: string, identity?: DocumentIdentity) {
+    const tab = this.tabs.get(tabId);
+    if (!tab || !matchesDocument(tab, identity)) return false;
+    this.screenshotCache.set(tabId, { ...identity!, dataUrl: base64DataUrl, simulated: true });
     while (this.screenshotCache.size > MAX_SCREENSHOTS) {
       const oldest = this.screenshotCache.keys().next().value;
       if (oldest === undefined) break;
       this.screenshotCache.delete(oldest);
     }
-    this.broadcast('screenshot_captured', { tabId, timestamp: Date.now() });
+    this.broadcast('screenshot_captured', { ...identity, simulated: true, timestamp: Date.now() });
+    return true;
   }
 
   public getScreenshot(tabId?: string): string | undefined {
     const targetId = tabId || this.activeTabId;
-    return this.screenshotCache.get(targetId);
+    const tab = this.tabs.get(targetId);
+    const shot = this.screenshotCache.get(targetId);
+    return tab && matchesDocument(tab, shot) ? shot?.dataUrl : undefined;
   }
 
   // Visual feedback trigger (mouse cursor, click ripple, typing toast)
@@ -396,7 +440,10 @@ class BrowserStateManager {
     const commandId = 'cmd-' + Math.random().toString(36).substring(2, 10);
     const targetTabId = tabId || this.activeTabId;
 
+    const targetTab = this.tabs.get(targetTabId);
     const command: BrowserCommand = {
+      navigationId: targetTab?.navigationId ?? 0,
+      url: targetTab?.url,
       id: commandId,
       tabId: targetTabId,
       type,
@@ -404,6 +451,10 @@ class BrowserStateManager {
       timestamp: Date.now(),
     };
 
+    if (targetTab?.url.startsWith('http') && !['navigate', 'open_tab', 'close_tab', 'switch_tab', 'history'].includes(type)) {
+      const error = iframeCommandError(type);
+      if (error) return { commandId, success: false, error };
+    }
     // If no UI clients connected, handle command with server fallback
     if (this.uiEventClients.size === 0) {
       return this.handleHeadlessCommand(command);
@@ -412,16 +463,32 @@ class BrowserStateManager {
     return new Promise<BrowserCommandResult>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pendingCommands.delete(commandId);
-        // Fallback to headless execution if UI timed out
-        const fallback = this.handleHeadlessCommand(command);
-        resolve(fallback);
+        resolve({ commandId, success: false, error: `UI command timeout: ${type}; execution unconfirmed` });
       }, timeoutMs);
 
-      this.pendingCommands.set(commandId, { resolve, reject, timer });
+      this.pendingCommands.set(commandId, { resolve, reject, timer, command });
 
       // Dispatch to frontend browser
       this.broadcast('execute_command', command);
     });
+  }
+
+  public async waitForDocument(tabId: string, timeoutMs = 2500): Promise<BrowserCommandResult> {
+    const tab = this.tabs.get(tabId);
+    const identity = tab && { tabId, url: tab.url, navigationId: tab.navigationId ?? 0 };
+    const deadline = Date.now() + timeoutMs;
+    while (tab && identity && matchesDocument(tab, identity)) {
+      const snapshot = this.getDomSnapshot(tabId);
+      if (snapshot) {
+        const data = classifyChallenge(tab, snapshot);
+        const success = !['fetch_error', 'cors_error', 'empty_or_not_ready', 'stale_or_disconnected'].includes(data.state);
+        return { commandId: 'navigation', success, data, error: success ? undefined : `Target document not ready: ${data.state}` };
+      }
+      if (!this.uiEventClients.size) return { commandId: 'navigation', success: false, error: 'UI disconnected; target document not confirmed' };
+      if (Date.now() >= deadline) break;
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    return { commandId: 'navigation', success: false, error: 'Navigation timeout or superseded; target document not confirmed' };
   }
 
   public resolveCommandResult(result: BrowserCommandResult) {
@@ -429,22 +496,19 @@ class BrowserStateManager {
     if (pending) {
       clearTimeout(pending.timer);
       this.pendingCommands.delete(result.commandId);
-      pending.resolve(result);
+      const tab = this.tabs.get(pending.command.tabId!);
+      if (!tab || !matchesDocument(tab, { tabId: tab.id, url: pending.command.url, navigationId: pending.command.navigationId })) {
+        pending.resolve({ commandId: result.commandId, success: false, error: 'Stale command result: document changed' });
+      } else if (pending.command.type === 'extract_content' && result.success &&
+        (!matchesDocument(tab, result.data) || !result.data?.excerpt?.trim() || classifyChallenge(tab, { ...this.getDomSnapshot(tab.id), ...result.data, textExcerpt: result.data.excerpt }).state !== 'ok')) {
+        pending.resolve({ commandId: result.commandId, success: false, error: 'Empty, blocked or ungrounded extraction' });
+      } else pending.resolve(result);
     }
   }
 
   private handleHeadlessCommand(command: BrowserCommand): BrowserCommandResult {
     const tab = this.getTab(command.tabId || this.activeTabId) || this.getActiveTab();
     switch (command.type) {
-      case 'navigate': {
-        const url = command.params.url;
-        const updated = this.navigateTab(tab.id, url);
-        return {
-          commandId: command.id,
-          success: true,
-          data: { url: updated.url, tabId: updated.id, title: updated.title },
-        };
-      }
       case 'open_tab': {
         const opened = this.openTab(command.params.url, command.params.title);
         return {
@@ -469,25 +533,8 @@ class BrowserStateManager {
           data: { activeTabId: this.activeTabId },
         };
       }
-      case 'history': {
-        if (command.params.action === 'back') this.historyBack(tab.id);
-        else if (command.params.action === 'forward') this.historyForward(tab.id);
-        return { commandId: command.id, success: true, data: { url: tab.url } };
-      }
-      case 'click':
-      case 'type':
-      case 'scroll':
-      case 'evaluate':
-      case 'screenshot':
       default:
-        return {
-          commandId: command.id,
-          success: true,
-          data: {
-            message: `Command ${command.type} executed successfully on ${tab.url}`,
-            tabId: tab.id,
-          },
-        };
+        return { commandId: command.id, success: false, error: `UI disconnected: ${command.type} not executed` };
     }
   }
 }

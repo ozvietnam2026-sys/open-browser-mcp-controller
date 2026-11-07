@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.6** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Version: **4.1.7** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
@@ -19,6 +19,14 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.7 — grounded observations (P0)
+- `tabId + URL + navigationId` bind DOM, extraction and simulated screenshot metadata. Navigation/history/reload invalidate caches; mismatched iframe messages are ignored.
+- Evidence-based, site-agnostic challenge states distinguish traffic walls, login, app/QR login, fetch/CORS errors and empty/stale observations. Feedback QR is not login; slider detection requires a visible widget signal.
+- UI disconnect, timeout, unsupported external iframe commands and empty/unbound extraction fail closed. Navigation waits for an observation; a tool ACK is not proof of task completion.
+- Agent results expose `completed / blocked / needs_user / failed`. Completion needs explicit model intent plus a quote from the current observation; no-tool responses and step limits are not automatic success.
+- **Limits / Giới hạn:** this is not captcha bypass. External iframe forwarding still supports only click/type/scroll, not drag/extract. `browser_screenshot` remains simulated canvas text; Gemini still discards image blocks. Real Chrome routing, real pixels and human Continue remain P1. MCP auth and upstream Cookie/Authorization isolation are unchanged.
+- Made-in-China.com is an upcoming sourcing target; add fixtures only after observed live evidence. No site-specific wall text is assumed.
 
 ### v4.1 highlights
 - **Vercel** `maxDuration: 300` + SSE heartbeats every ~15s (reconnect-friendly)

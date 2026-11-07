@@ -1,3 +1,4 @@
+import { classifyChallenge } from '../shared/challenge-state.js';
 /**
  * Model Context Protocol (MCP) Server Implementation
  * Compliant with MCP 2024-11-05 Specification
@@ -262,13 +263,14 @@ export class McpServerHandler {
         const targetTabId = activeTab?.id || 'tab-1';
 
         browserState.navigateTab(targetTabId, url);
-        await browserState.dispatchCommand('navigate', { url }, targetTabId);
+        const result = await browserState.waitForDocument(targetTabId);
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
-              text: `✅ Đã điều hướng tab [${targetTabId}] đến: ${url}. Đang tải nội dung trang...`,
+              text: JSON.stringify({ success: result.success, url: browserState.getTab(targetTabId)?.url, observation: result.data, error: result.error }),
             },
           ],
         };
@@ -352,19 +354,21 @@ export class McpServerHandler {
 
         let snapshot = browserState.getDomSnapshot(targetTab.id);
 
-        if (!snapshot || snapshot.interactiveElements.length === 0) {
+        if (!snapshot) {
           const cmdResult = await browserState.dispatchCommand('evaluate', { getDom: true }, targetTab.id);
           if (cmdResult.data?.snapshot) {
-            snapshot = cmdResult.data.snapshot;
+            browserState.setDomSnapshot(targetTab.id, cmdResult.data.snapshot);
+            snapshot = browserState.getDomSnapshot(targetTab.id);
           }
         }
 
         if (!snapshot) {
           return {
+            isError: true,
             content: [
               {
                 type: 'text',
-                text: `Trang hiện tại: "${targetTab.title}" (${targetTab.url})\nTrạng thái: Đang tải hoặc chưa có phần tử tương tác nào.`,
+                text: JSON.stringify(classifyChallenge(targetTab, undefined)),
               },
             ],
           };
@@ -390,7 +394,7 @@ export class McpServerHandler {
             content: [
               {
                 type: 'text',
-                text: `Trang: "${snapshot.title}"\nURL: ${snapshot.url}\n\nCác phần tử tương tác (@ref) trên trang:\n${
+                text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTrang: "${snapshot.title}"\nURL: ${snapshot.url}\n\nCác phần tử tương tác (@ref) trên trang:\n${
                   elementsList || '(Không có phần tử tương tác)'
                 }\n\n* Bạn có thể gọi tool "browser_click", "browser_type", "browser_hover", "browser_drag" bằng cách truyền tham số ref (ví dụ: ref: "@ref:1" hoặc "1").`,
               },
@@ -403,7 +407,7 @@ export class McpServerHandler {
             content: [
               {
                 type: 'text',
-                text: `Tiêu đề: ${snapshot.title}\nURL: ${snapshot.url}\n\nNội dung văn bản:\n${snapshot.textExcerpt}`,
+                text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTiêu đề: ${snapshot.title}\nURL: ${snapshot.url}\n\nNội dung văn bản:\n${snapshot.textExcerpt}`,
               },
             ],
           };
@@ -413,7 +417,7 @@ export class McpServerHandler {
           content: [
             {
               type: 'text',
-              text: `Tiêu đề: ${snapshot.title}\nURL: ${snapshot.url}\n\nCấu trúc trang (Simplified Tree):\n${
+              text: `Quan sát: ${JSON.stringify(classifyChallenge(targetTab, snapshot))}\nTiêu đề: ${snapshot.title}\nURL: ${snapshot.url}\n\nCấu trúc trang (Simplified Tree):\n${
                 snapshot.simplifiedTree || snapshot.textExcerpt
               }`,
             },
@@ -444,6 +448,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -477,6 +482,7 @@ export class McpServerHandler {
           targetTab?.id
         );
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -507,6 +513,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -538,6 +545,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -571,6 +579,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -594,6 +603,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -616,6 +626,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -641,6 +652,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -663,6 +675,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -691,10 +704,11 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
-              text: `✅ Đã cuộn trang theo hướng: ${direction} (${direction === 'top' || direction === 'bottom' ? 'toàn bộ' : `${amount}px`}).`,
+              text: result.success ? `✅ Đã cuộn trang: ${direction}` : `❌ ${result.error}`,
             },
           ],
         };
@@ -715,15 +729,16 @@ export class McpServerHandler {
           targetTab?.id
         );
 
-        const dataUrl = result.data?.dataUrl || browserState.getScreenshot(targetTab?.id);
+        const dataUrl = result.success ? result.data?.dataUrl : undefined;
 
         if (dataUrl && dataUrl.startsWith('data:image/')) {
           const base64Data = dataUrl.split(',')[1];
           return {
+            isError: !result.success,
             content: [
               {
                 type: 'text',
-                text: `✅ Đã chụp ảnh màn hình trang "${targetTab?.title}" (${targetTab?.url}) thành công.`,
+                text: `Canvas mô phỏng (không phải pixel website): ${JSON.stringify({ tabId: targetTab?.id, url: targetTab?.url, navigationId: targetTab?.navigationId, simulated: true })}`,
               },
               {
                 type: 'image',
@@ -735,10 +750,11 @@ export class McpServerHandler {
         }
 
         return {
+          isError: true,
           content: [
             {
               type: 'text',
-              text: `✅ Đã ghi nhận yêu cầu chụp ảnh màn hình trang "${targetTab?.title}". Viewport đã lưu ảnh snapshot.`,
+              text: `❌ Không có ảnh được xác nhận: ${result.error || 'empty screenshot'}`,
             },
           ],
         };
@@ -756,6 +772,7 @@ export class McpServerHandler {
         );
 
         return {
+          isError: !result.success,
           content: [
             {
               type: 'text',
@@ -769,47 +786,14 @@ export class McpServerHandler {
 
       case 'browser_history': {
         const { action, tabId } = args;
-        const targetTab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
-
-        if (action === 'back') {
-          const success = browserState.historyBack(targetTab?.id);
-          await browserState.dispatchCommand('history', { action: 'back' }, targetTab?.id);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: success
-                  ? `✅ Đã quay lại trang trước (${targetTab?.url})`
-                  : `⚠️ Không có trang trước trong lịch sử tab`,
-              },
-            ],
-          };
-        }
-
-        if (action === 'forward') {
-          const success = browserState.historyForward(targetTab?.id);
-          await browserState.dispatchCommand('history', { action: 'forward' }, targetTab?.id);
-          return {
-            content: [
-              {
-                type: 'text',
-                text: success
-                  ? `✅ Đã tiến tới trang sau (${targetTab?.url})`
-                  : `⚠️ Không có trang sau trong lịch sử tab`,
-              },
-            ],
-          };
-        }
-
-        await browserState.dispatchCommand('history', { action: 'reload' }, targetTab?.id);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `✅ Đã tải lại trang "${targetTab?.title}"`,
-            },
-          ],
-        };
+        const tab = tabId ? browserState.getTab(tabId) : browserState.getActiveTab();
+        if (!tab) throw new Error('Tab not found');
+        const changed = action === 'back' ? browserState.historyBack(tab.id) :
+          action === 'forward' ? browserState.historyForward(tab.id) :
+          action === 'reload' ? (browserState.reloadTab(tab.id), true) : false;
+        const result = changed ? await browserState.waitForDocument(tab.id) :
+          { success: false, error: 'History action unavailable' };
+        return { isError: !result.success, content: [{ type: 'text', text: JSON.stringify(result) }] };
       }
 
       default:

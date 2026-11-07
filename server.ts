@@ -122,7 +122,7 @@ app.post('/api/extract/:tool', async (req: Request, res: Response) => {
 app.get('/api/extract/health', (_req: Request, res: Response) => {
   res.json({
     ok: true,
-    version: '4.1.6',
+    version: '4.1.7',
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],
@@ -291,16 +291,18 @@ app.post('/api/browser/command-result', (req: Request, res: Response) => {
 app.post('/api/browser/dom-snapshot', (req: Request, res: Response) => {
   const { tabId, snapshot } = req.body;
   if (tabId && snapshot) {
-    browserState.setDomSnapshot(tabId, snapshot);
+    const accepted = browserState.setDomSnapshot(tabId, snapshot);
+    return res.status(accepted ? 200 : 409).json({ success: accepted });
   }
   res.json({ success: true });
 });
 
 // Frontend UI uploads screenshot data URL
 app.post('/api/browser/screenshot', (req: Request, res: Response) => {
-  const { tabId, dataUrl } = req.body;
+  const { tabId, dataUrl, url, navigationId } = req.body;
   if (tabId && dataUrl) {
-    browserState.setScreenshot(tabId, dataUrl);
+    const accepted = browserState.setScreenshot(tabId, dataUrl, { tabId, url, navigationId });
+    return res.status(accepted ? 200 : 409).json({ success: accepted });
   }
   res.json({ success: true });
 });

@@ -14,6 +14,7 @@ export interface BrowserTab {
   historyIndex: number;
   scrollY?: number;
   lastUpdated: number;
+  navigationId?: number;
 }
 
 export interface ElementBoundingBox {
@@ -42,6 +43,9 @@ export interface InteractiveElement {
 }
 
 export interface DomSnapshot {
+  documentUrl?: string;
+  tabId?: string;
+  navigationId?: number;
   url: string;
   title: string;
   interactiveElements: InteractiveElement[];
@@ -52,6 +56,8 @@ export interface DomSnapshot {
 }
 
 export interface BrowserCommand {
+  navigationId?: number;
+  url?: string;
   id: string;
   tabId?: string;
   type:

@@ -1,4 +1,4 @@
-# Feature Matrix — Open Browser MCP Controller v4.1.6
+# Feature Matrix — Open Browser MCP Controller v4.1.7
 
 Inventory of advanced / lesser-known features researched from public sources and adoption status.
 Ideas are **reimplemented** (not copied) under compatible licenses; paid SaaS APIs are not required.
@@ -150,6 +150,18 @@ Legend: **adopted** = in repo · **planned** = backlog · **N/A** = not applicab
 
 | Feature | Status | Notes |
 |---|---|---|
-| `browser_drag` (in-app proxy) | ✅ | Stepped pointer/mouse event sequence (down → moves → up) by viewport coords or ref/selector; same-origin iframes only. |
+| `browser_drag` (built-in viewport) | Partial | Stepped synthetic pointer/mouse sequence in built-in pages; external proxy iframe forwarding is unsupported and fails closed in v4.1.7. Not real-site captcha bypass. |
 | `pw_mouse_drag_xy` (Playwright) | ✅ | Real `page.mouse.down/move/up` with stepped moves. |
 | Agent guidance | ✅ | Complete interactive challenges shown to the user (slider, simple puzzles); QR/app-login walls are reported to the user, never filled with invented data. No third-party solving services. |
+
+
+## Observation reliability (v4.1.7 / obmc-challenge-detect-20261107)
+| Feature | Status | Boundary |
+|---|---|---|
+| Navigation-bound observations | adopted | DOM, extraction and simulated screenshot metadata carry tabId/URL/navigationId; navigation/history/reload invalidate caches. Wrong iframe source or generation is ignored. |
+| Challenge classifier | adopted | Current visible text + widget evidence, fixture tests for 1688 unusual traffic/feedback QR, Taobao login, AliExpress fetch error, empty/stale evidence. `ok` is not task completion. |
+| Fail-closed execution | adopted | Disconnect, timeout and unsupported external iframe operations return failure; MCP isError propagates to agent. Navigation requires a current observation. |
+| Final-answer gate | adopted | Explicit completion proposal + current quote + valid document + no latest tool failure; blocked/unknown observations cannot report completed. Semantic task correctness still needs real-site evaluation. |
+| Real iframe pixels / Gemini image blocks | planned P1 | Canvas is simulated; Gemini uses text blocks only. |
+| Chrome routing / login pause + Continue | planned P1 | Not implemented in this hotfix. No captcha-solving services or auth weakening. |
+| Made-in-China.com fixtures | planned | Upcoming supplier search/lookup site; require live evidence before adding site-specific cases. |

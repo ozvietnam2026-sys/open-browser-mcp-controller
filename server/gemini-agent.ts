@@ -1,3 +1,4 @@
+import { classifyChallenge, validateFinalAnswer, type AgentOutcome } from '../shared/challenge-state.js';
 /**
  * Autonomous Browser AI Agent powered by Gemini 3.8 Flash
  * Executes multi-step browser tasks using the expanded Browser MCP tools.
@@ -58,7 +59,7 @@ export class GeminiBrowserAgent {
     task: string,
     onStep: (step: AgentStep) => void,
     jobId: string = 'job-' + Date.now()
-  ): Promise<{ success: boolean; answer: string; steps: AgentStep[] }> {
+  ): Promise<{ success: boolean; outcome: AgentOutcome; answer: string; steps: AgentStep[] }> {
     const job = { abort: false };
     this.activeJobs.set(jobId, job);
 
@@ -100,7 +101,7 @@ const MAX_STEPS = 14;
       };
       steps.push(errStep);
       onStep(errStep);
-      return { success: false, answer: errorMsg, steps };
+      return { outcome: 'failed', success: false, answer: errorMsg, steps };
     }
 
     const ai = new GoogleGenAI({
@@ -281,6 +282,12 @@ QUAN TRỌNG — TRANG WEB THẬT:
 
 ${PRICE_GROUNDING_RULES}
 ${CAPTCHA_INTERACTION_RULES}
+QUY TẮC QUAN SÁT HIỆN TẠI (obmc-challenge-detect-20261107):
+- Chỉ dùng DOM thuộc tabId + URL + navigationId hiện tại. Bỏ nội dung của lần điều hướng trước.
+- ok chỉ là chưa phát hiện tường, KHÔNG chứng minh mục tiêu hoàn tất. QR phản hồi không phải QR đăng nhập.
+- Ảnh browser_screenshot hiện chỉ là canvas mô phỏng, không phải pixel website thật. External iframe chưa hỗ trợ drag/extract; không hứa vượt captcha.
+- Khi kết thúc, trả JSON thuần: {"outcome":"completed|blocked|needs_user|failed","answer":"trả lời tiếng Việt","evidence":"trích nguyên văn ít nhất 8 ký tự từ DOM hiện tại chứng minh mục tiêu đạt được"}.
+- Chỉ chọn completed khi mục tiêu thực sự đạt được; hết bước / không gọi tool / nội dung rỗng không phải thành công.
 NGUYÊN TẮC HÀNH ĐỘNG:
 - Sau mỗi thao tác quan trọng (navigate, click, type), hãy quan sát trạng thái mới.
 - Để click hoặc gõ phím, hãy sử dụng mã tham chiếu ref (ví dụ: "@ref:1", "@ref:2"...) được cung cấp từ browser_get_dom hoặc quan sát.
@@ -289,6 +296,7 @@ NGUYÊN TẮC HÀNH ĐỘNG:
 `;
 
     const conversationContents: any[] = [];
+    let lastToolFailed = false;
 
     const currentTab = browserState.getActiveTab();
     const initialDom = browserState.getDomSnapshot(currentTab.id);
@@ -298,6 +306,7 @@ NGUYÊN TẮC HÀNH ĐỘNG:
 Trạng thái trình duyệt hiện tại:
 - Tab hiện tại: [${currentTab.id}] "${currentTab.title}"
 - URL: ${currentTab.url}
+- Quan sát có nguồn: ${JSON.stringify(classifyChallenge(currentTab, initialDom))}
 - Tóm tắt DOM: ${initialDom ? initialDom.simplifiedTree.substring(0, 1000) : 'Chưa có thông tin DOM, hãy bắt đầu bằng điều hướng hoặc lấy DOM.'}
 
 Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần gọi.`;
@@ -318,7 +327,7 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
           };
           steps.push(abortStep);
           onStep(abortStep);
-          return { success: false, answer: 'Đã dừng tác vụ.', steps };
+          return { outcome: 'failed', success: false, answer: 'Đã dừng tác vụ.', steps };
         }
 
         const response = await generateWithCascade(ai, {
@@ -337,7 +346,9 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
         const thought = textPart?.text || '';
 
         if (!functionCalls || functionCalls.length === 0) {
-          const finalAnswer = thought || 'Đã hoàn thành tác vụ duyệt web.';
+          const tab = browserState.getActiveTab();
+          const decision = validateFinalAnswer(tab, browserState.getDomSnapshot(tab.id), thought, lastToolFailed);
+          const finalAnswer = decision.answer;
           const step: AgentStep = {
             stepNumber: stepIndex,
             thought: thought,
@@ -346,7 +357,7 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
           };
           steps.push(step);
           onStep(step);
-          return { success: true, answer: finalAnswer, steps };
+          return { outcome: decision.outcome, success: decision.outcome === 'completed', answer: finalAnswer, steps };
         }
 
         const firstPart = functionCalls[0];
@@ -375,7 +386,7 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
           const mcpRes = await McpServerHandler.executeTool(toolName, toolArgs);
           toolExecutionResult = mcpRes?.content?.[0]?.text || JSON.stringify(mcpRes);
           stepRecord.toolResult = {
-            success: true,
+            success: !mcpRes?.isError,
             output: toolExecutionResult,
           };
         } catch (err: any) {
@@ -386,6 +397,7 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
           };
         }
 
+        lastToolFailed = stepRecord.toolResult?.success !== true;
         steps.push(stepRecord);
         onStep(stepRecord);
 
@@ -400,6 +412,7 @@ Hãy phân tích mục tiêu và quyết định công cụ đầu tiên cần g
         const updatedDom = browserState.getDomSnapshot(updatedTab.id);
 
         const stateObservation = `[Quan sát sau khi thực hiện ${toolName}]:
+Quan sát có nguồn: ${JSON.stringify(classifyChallenge(updatedTab, updatedDom))}
 URL hiện tại: ${updatedTab.url}
 Tiêu đề: ${updatedTab.title}
 ${
@@ -424,8 +437,9 @@ ${
         });
       }
 
-      const finalAnswer = 'Đã đạt giới hạn số bước thực thi.';
-      return { success: true, answer: finalAnswer, steps };
+      const tab = browserState.getActiveTab();
+      const finalAnswer = `Chưa hoàn thành: đã đạt giới hạn số bước. ${JSON.stringify(classifyChallenge(tab, browserState.getDomSnapshot(tab.id)))}`;
+      return { outcome: 'failed', success: false, answer: finalAnswer, steps };
     } catch (err: any) {
       console.error('Agent loop error:', err);
       const errorStep: AgentStep = {
@@ -436,7 +450,7 @@ ${
       };
       steps.push(errorStep);
       onStep(errorStep);
-      return { success: false, answer: errorStep.finalAnswer || '', steps };
+      return { outcome: 'failed', success: false, answer: errorStep.finalAnswer || '', steps };
     } finally {
       this.activeJobs.delete(jobId);
     }

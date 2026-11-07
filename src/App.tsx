@@ -112,10 +112,9 @@ export default function App() {
 
   // Screenshot viewer modal
   const [screenshotModal, setScreenshotModal] = useState<{ url: string; dataUrl: string } | null>(null);
-  // Bump to force iframe remount on Reload (proxy pages otherwise keep stale document)
-  const [reloadNonce, setReloadNonce] = useState(0);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+  useEffect(() => { setCurrentSnapshot(undefined); }, [activeTabId, activeTab.url, activeTab.navigationId]);
 
   // Listen to SSE events from server via singleton sseClient
   useEffect(() => {
@@ -280,6 +279,7 @@ export default function App() {
           return {
             ...t,
             url: cleanUrl,
+            navigationId: (t.navigationId ?? 0) + (t.url === cleanUrl ? 0 : 1),
             history: newHistory,
             historyIndex: newHistory.length - 1,
             canGoBack: true,
@@ -312,53 +312,17 @@ export default function App() {
     }).catch(() => {});
   };
 
-  const handleBack = () => {
-    setTabs((prev) =>
-      prev.map((t) => {
-        if (t.id === activeTabId && t.historyIndex > 0) {
-          const newIdx = t.historyIndex - 1;
-          return {
-            ...t,
-            historyIndex: newIdx,
-            url: t.history[newIdx],
-            canGoBack: newIdx > 0,
-            canGoForward: true,
-          };
-        }
-        return t;
-      })
-    );
+  // Server owns history and document generations, including same-URL reloads.
+  const requestHistory = (action: 'back' | 'forward' | 'reload') => {
+    fetch('/api/mcp/rpc', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call',
+        params: { name: 'browser_history', arguments: { action, tabId: activeTabId } } }),
+    }).catch(() => {});
   };
-
-  const handleForward = () => {
-    setTabs((prev) =>
-      prev.map((t) => {
-        if (t.id === activeTabId && t.historyIndex < t.history.length - 1) {
-          const newIdx = t.historyIndex + 1;
-          return {
-            ...t,
-            historyIndex: newIdx,
-            url: t.history[newIdx],
-            canGoBack: true,
-            canGoForward: newIdx < t.history.length - 1,
-          };
-        }
-        return t;
-      })
-    );
-  };
-
-  const handleReload = () => {
-    setTabs((prev) =>
-      prev.map((t) => (t.id === activeTabId ? { ...t, isLoading: true } : t))
-    );
-    setReloadNonce((n) => n + 1);
-    setTimeout(() => {
-      setTabs((prev) =>
-        prev.map((t) => (t.id === activeTabId ? { ...t, isLoading: false } : t))
-      );
-    }, 600);
-  };
+  const handleBack = () => requestHistory('back');
+  const handleForward = () => requestHistory('forward');
+  const handleReload = () => requestHistory('reload');
 
   const handleTitleChange = useCallback((newTitle: string) => {
     setTabs((prev) =>
@@ -484,7 +448,7 @@ export default function App() {
           <BrowserViewport
             activeTabId={activeTabId}
             url={activeTab?.url || 'browser://search'}
-            reloadNonce={reloadNonce}
+            navigationId={activeTab.navigationId ?? 0}
             onNavigate={handleNavigate}
             onTitleChange={handleTitleChange}
             showInspectorOverlay={showInspectorOverlay}

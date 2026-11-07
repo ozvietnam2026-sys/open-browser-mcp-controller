@@ -78,6 +78,10 @@ export class ProxyEngine {
 
     const method = (req.method || 'GET').toUpperCase();
     const startTime = Date.now();
+    // Captured from the request, never retag an old response with the newest generation.
+    const identity = { tabId: String(req.query.tabId || ''), url: targetUrl.href, navigationId: Number(req.query.navigationId ?? -1) };
+    const escapeHtml = (value: unknown) => String(value).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!));
+    const safeJson = (value: unknown) => JSON.stringify(value).replace(/</g, '\\u003c');
 
     try {
       const outboundHeaders = buildOutboundProxyHeaders(
@@ -215,7 +219,8 @@ ${fetchRewrite}
                 var interactive = collectInteractiveElements();
                 var textExcerpt = document.body ? document.body.innerText.substring(0, 2000) : '';
                 var snapshot = {
-                  url: window.location.href,
+                  ...${safeJson(identity)},
+                  documentUrl: ${safeJson(response.url || targetUrl.href)},
                   title: document.title || 'Untitled Page',
                   interactiveElements: interactive,
                   simplifiedTree: interactive.map(function(el) {
@@ -274,6 +279,7 @@ ${fetchRewrite}
                       sendDomSnapshot();
                       window.parent.postMessage({
                         type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
                         commandId: data.commandId,
                         success: true,
                         elementDesc: targetNode.tagName.toLowerCase() + (targetNode.id ? '#' + targetNode.id : '')
@@ -282,6 +288,7 @@ ${fetchRewrite}
                   } else {
                     window.parent.postMessage({
                       type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
                       commandId: data.commandId,
                       success: false,
                       error: 'Không tìm thấy phần tử'
@@ -323,12 +330,14 @@ ${fetchRewrite}
                     sendDomSnapshot();
                     window.parent.postMessage({
                       type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
                       commandId: data.commandId,
                       success: true
                     }, '*');
                   } else {
                     window.parent.postMessage({
                       type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
                       commandId: data.commandId,
                       success: false,
                       error: 'Không tìm thấy ô nhập liệu hợp lệ'
@@ -347,6 +356,7 @@ ${fetchRewrite}
                     sendDomSnapshot();
                     window.parent.postMessage({
                       type: 'MCP_COMMAND_COMPLETED',
+                      identity: ${safeJson(identity)},
                       commandId: data.commandId,
                       success: true
                     }, '*');
@@ -406,11 +416,18 @@ ${fetchRewrite}
         <body>
           <div class="card">
             <h2>⚠️ Không thể kết nối tới trang web</h2>
-            <p>Trang web <code>${targetUrl.toString()}</code> không phản hồi hoặc chặn yêu cầu proxy (CORS/Bot protection).</p>
-            <p><strong>Lỗi chi tiết:</strong> ${err?.message || 'Network Timeout'}</p>
-            <p>Trình duyệt vẫn đang đứng ở đúng địa chỉ vừa mở. Đừng chuyển sang các trang mẫu (NovaTech Store, AeroSearch) để thay thế trang này — đó chỉ là trang test demo.</p>
-            <p>Nếu trang thật chặn lớp proxy (hay gặp với Taobao, 1688, Tmall), hãy tải lại hoặc dùng phiên Chrome thật trên máy chủ. Các trang mẫu <code>browser://store</code> / <code>browser://search</code> không phải nhà cung cấp thật.</p>
+            <p>Trang web <code>${escapeHtml(targetUrl.toString())}</code> không phản hồi hoặc chặn yêu cầu proxy (CORS/Bot protection).</p>
+            <p><strong>Lỗi chi tiết:</strong> ${escapeHtml(err?.message || 'Network Timeout')}</p>
+            <p>Giữ nguyên địa chỉ hiện tại; tải lại để thử kết nối. Không có dữ liệu sản phẩm để trích xuất.</p>
+            <button onclick="window.location.reload()">Thử lại cùng URL</button>
           </div>
+          <script>
+            window.parent.postMessage({ type: 'MCP_DOM_SNAPSHOT', snapshot: {
+              ...${safeJson(identity)}, title: 'Lỗi tải trang qua Proxy', interactiveElements: [], simplifiedTree: '',
+              textExcerpt: 'Không thể kết nối tới trang web: fetch failed',
+              scrollPosition: { x: 0, y: 0, maxScrollY: 0 }, timestamp: Date.now()
+            } }, '*');
+          </script>
         </body>
         </html>
       `);
