@@ -41,6 +41,13 @@ Vite + React UI + Express MCP server. Agents can:
 - **Paginated reads**: snapshots now carry `fullText` (bounded 64KB) + `textTotalLength`; `browser_get_dom` accepts `offset` to page through long documents instead of the old hard 2.000-char cut.
 - Agent prompt rule added: hidden/lazy content is expected on marketplace pages — expand, page through, and only then conclude.
 
+### Open items from the 2026-11-07 HS-code session (for v4.1.14+)
+
+- Made-in-China product attrs (HS Code row) still does not auto-reveal end-to-end despite v2–v4 heuristics. Two named hypotheses to verify with server-side logging in `autoExpandPass` (clicks performed, blacklist entries, href before/after):
+  1. **Shadow DOM**: expanded attrs may hydrate inside a shadow root — `document.body.innerText` and `querySelectorAll` do not pierce shadow roots, so content can be visible to a human but invisible to every scan.
+  2. **Hash-change misdetection**: an expand that updates `location.hash` flips `location.href`, gets misread as navigation, and the toggle lands in the blacklist + `history.back()` resets the page.
+- Verification environment friction (both known): SSE drop after deploys → `UI disconnected` until the app tab is reloaded; shared singleton `browserState` resets `tab-1` mid-run (one pilot at a time).
+
 ### v4.1.9 — navigation wait re-bind + final-answer format nudge (`obmc-nav-wait-20261107`, `obmc-final-nudge-20261107`)
 
 - `waitForDocument` no longer fails when a newer navigation supersedes the one it started with: it keeps polling until the snapshot binds to the **current** document (default budget 2.5s → 10s; proxied marketplace pages routinely need more than 2.5s). This fixes the storm where `browser_navigate` reported "Navigation timeout or superseded" while the tab URL actually advanced, and every later `browser_get_dom` stayed `stale_or_disconnected` until all steps burned out.
