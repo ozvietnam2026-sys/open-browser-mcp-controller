@@ -243,13 +243,13 @@ ${fetchRewrite}
                   if (n.getAttribute('type') === 'submit') return false;
                   return true;
                 });
-                return strong.concat(labeled).filter(function(n) {
+                return labeled.concat(strong).filter(function(n) {
                   if (seen.has(n)) return false;
                   seen.add(n);
                   return nodeVisible(n);
                 });
               }
-              var expandBudget = 8;
+              var expandBudget = 12;
               function autoExpandPass() {
                 var cands = expandCandidates().slice(0, expandBudget);
                 cands.forEach(function(node) {

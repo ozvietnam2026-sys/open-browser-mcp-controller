@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.11** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Version: **4.1.12** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
@@ -19,6 +19,10 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.12 — deep read v3: content-reveal toggles first (`obmc-deep-read-20261107`)
+
+- Click-priority fix: class-confirmed reveal toggles (spec/attrs "View More" style) are clicked BEFORE generic aria-expanded widgets (menus, FAQ) — on Made-in-China the strong set alone exceeded the whole budget and the spec toggle never got its click. Budget 8 → 12.
 
 ### v4.1.11 — deep read v2: navigation-guarded expand heuristic (`obmc-deep-read-20261107`)
 
