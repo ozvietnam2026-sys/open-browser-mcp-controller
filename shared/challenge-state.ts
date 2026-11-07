@@ -19,6 +19,8 @@ export function classifyChallenge(tab: BrowserTab, snapshot?: DomSnapshot) {
   const text = (snapshot!.textExcerpt || '').trim();
   const rules: [ChallengeState, RegExp][] = [
     ['fetch_error', /fetch failed|failed to fetch|Không thể kết nối tới trang web|ERR_CONNECTION/i],
+    // obmc-mic-search-20261107: branded "no result / 404" pages (e.g. Made-in-China) are not login walls.
+    ['empty_or_not_ready', /(?:the )?information you are looking for is (?:not|no longer|currently not) available|information you are looking for is not available currently|page you are looking for (?:is not available|does not exist|cannot be found)/i],
     ['cors_error', /CORS (?:error|policy)|blocked by cross-origin policy/i],
     ['unusual_traffic', /unusual traffic|异常流量|访问过于频繁/i],
     ['session_unavailable', /session (?:unavailable|expired)|会话已过期/i],

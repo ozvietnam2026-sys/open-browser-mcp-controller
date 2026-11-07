@@ -35,6 +35,16 @@ QUY TẮC GIÁ — CHỈ DÙNG DỮ LIỆU THẬT TRÊN TRANG (BẮT BUỘC):
 - Ưu tiên ở lại website thật mà người dùng đang mở; được phép tìm kiếm trên chính website đó.
 `;
 
+/** Made-in-China search URL shapes (obmc-mic-search-20261107; exported for tests). */
+export const MIC_SEARCH_RULES = `
+QUY TẮC TÌM KIẾM MADE-IN-CHINA (made-in-china.com):
+- Ưu tiên: https://www.made-in-china.com/productdirectory.do?word={từ khóa}&subaction=hunt — BẮT BUỘC có subaction=hunt; thiếu nó site trả 404 / "not available currently".
+- Thay thế: https://www.made-in-china.com/products-search/hot-china-products/{Title_Case_With_Underscores}.html (khoảng trắng → "_", ví dụ Gpt_Pro_5000).
+- KHÔNG dùng /multi-search/{từ khóa}/1.html có "+" hoặc "%2B" trong đường dẫn. KHÔNG dùng productdirectory.do?word=... thiếu subaction=hunt.
+- Nếu trang hiện "The information you are looking for is not available currently": đó là trang không có kết quả do URL sai, KHÔNG phải tường đăng nhập. Thử lại ngay một trong hai dạng URL đúng ở trên; không bảo người dùng đăng nhập và không kết luận site không có nhà cung cấp. "Sign In / Join Free" ở đầu trang chỉ là thanh menu.
+- Vẫn KHÔNG bịa giá/MOQ; chỉ báo những gì hiển thị sau khi trang kết quả đúng đã tải.
+`;
+
 export function getMissingGeminiKeyMessage(env: NodeJS.ProcessEnv = process.env): string {
   if (env.VERCEL) {
     return 'Chưa cấu hình GEMINI_API_KEY. Trên Vercel: Project Settings → Environment Variables, thêm GEMINI_API_KEY cho Production/Preview, rồi Redeploy.';
@@ -282,6 +292,7 @@ QUAN TRỌNG — TRANG WEB THẬT:
 
 ${PRICE_GROUNDING_RULES}
 ${CAPTCHA_INTERACTION_RULES}
+${MIC_SEARCH_RULES}
 QUY TẮC QUAN SÁT HIỆN TẠI (obmc-challenge-detect-20261107):
 - Chỉ dùng DOM thuộc tabId + URL + navigationId hiện tại. Bỏ nội dung của lần điều hướng trước.
 - ok chỉ là chưa phát hiện tường, KHÔNG chứng minh mục tiêu hoàn tất. QR phản hồi không phải QR đăng nhập.

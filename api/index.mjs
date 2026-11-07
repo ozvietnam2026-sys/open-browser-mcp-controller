@@ -25247,8 +25247,8 @@ function getConfig() {
   const envCaps = parseCaps(process.env.MCP_CAPS || process.env.OBMC_CAPS || process.env.PLAYWRIGHT_MCP_CAPS);
   const caps = runtimeCapsOverride || envCaps || profileCaps;
   return {
-    version: "4.1.7",
-    userAgent: process.env.OBMC_USER_AGENT || process.env.AGENT_BROWSER_USER_AGENT || "OpenBrowserMCP/4.1.7 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller; research bot)",
+    version: "4.1.8",
+    userAgent: process.env.OBMC_USER_AGENT || process.env.AGENT_BROWSER_USER_AGENT || "OpenBrowserMCP/4.1.8 (+https://github.com/ozvietnam2026-sys/open-browser-mcp-controller; research bot)",
     proxyUrl: process.env.OBMC_PROXY || process.env.AGENT_BROWSER_PROXY || process.env.HTTPS_PROXY || process.env.HTTP_PROXY || void 0,
     proxyBypass: parseList(process.env.OBMC_PROXY_BYPASS || process.env.AGENT_BROWSER_PROXY_BYPASS || process.env.NO_PROXY),
     allowedDomains: parseList(process.env.OBMC_ALLOWED_DOMAINS || process.env.AGENT_BROWSER_ALLOWED_DOMAINS),
@@ -98152,6 +98152,8 @@ function classifyChallenge(tab, snapshot) {
   const text3 = (snapshot.textExcerpt || "").trim();
   const rules = [
     ["fetch_error", /fetch failed|failed to fetch|Không thể kết nối tới trang web|ERR_CONNECTION/i],
+    // obmc-mic-search-20261107: branded "no result / 404" pages (e.g. Made-in-China) are not login walls.
+    ["empty_or_not_ready", /(?:the )?information you are looking for is (?:not|no longer|currently not) available|information you are looking for is not available currently|page you are looking for (?:is not available|does not exist|cannot be found)/i],
     ["cors_error", /CORS (?:error|policy)|blocked by cross-origin policy/i],
     ["unusual_traffic", /unusual traffic|异常流量|访问过于频繁/i],
     ["session_unavailable", /session (?:unavailable|expired)|会话已过期/i],
@@ -117887,6 +117889,14 @@ QUY T\u1EAEC GI\xC1 \u2014 CH\u1EC8 D\xD9NG D\u1EEE LI\u1EC6U TH\u1EACT TR\xCAN 
 - Trong tr\u01B0\u1EDDng h\u1EE3p \u0111\xF3, h\xE3y n\xF3i r\xF5: kh\xF4ng \u0111\u1ECDc \u0111\u01B0\u1EE3c danh s\xE1ch s\u1EA3n ph\u1EA9m t\u1EEB trang hi\u1EC7n t\u1EA1i, m\xF4 t\u1EA3 tr\u1EDF ng\u1EA1i (c\u1EA7n \u0111\u0103ng nh\u1EADp / x\xE1c minh QR / captcha) k\xE8m URL, v\xE0 g\u1EE3i \xFD ng\u01B0\u1EDDi d\xF9ng \u0111\u0103ng nh\u1EADp ho\u1EB7c v\u01B0\u1EE3t x\xE1c minh r\u1ED3i th\u1EED l\u1EA1i.
 - \u01AFu ti\xEAn \u1EDF l\u1EA1i website th\u1EADt m\xE0 ng\u01B0\u1EDDi d\xF9ng \u0111ang m\u1EDF; \u0111\u01B0\u1EE3c ph\xE9p t\xECm ki\u1EBFm tr\xEAn ch\xEDnh website \u0111\xF3.
 `;
+var MIC_SEARCH_RULES = `
+QUY T\u1EAEC T\xCCM KI\u1EBEM MADE-IN-CHINA (made-in-china.com):
+- \u01AFu ti\xEAn: https://www.made-in-china.com/productdirectory.do?word={t\u1EEB kh\xF3a}&subaction=hunt \u2014 B\u1EAET BU\u1ED8C c\xF3 subaction=hunt; thi\u1EBFu n\xF3 site tr\u1EA3 404 / "not available currently".
+- Thay th\u1EBF: https://www.made-in-china.com/products-search/hot-china-products/{Title_Case_With_Underscores}.html (kho\u1EA3ng tr\u1EAFng \u2192 "_", v\xED d\u1EE5 Gpt_Pro_5000).
+- KH\xD4NG d\xF9ng /multi-search/{t\u1EEB kh\xF3a}/1.html c\xF3 "+" ho\u1EB7c "%2B" trong \u0111\u01B0\u1EDDng d\u1EABn. KH\xD4NG d\xF9ng productdirectory.do?word=... thi\u1EBFu subaction=hunt.
+- N\u1EBFu trang hi\u1EC7n "The information you are looking for is not available currently": \u0111\xF3 l\xE0 trang kh\xF4ng c\xF3 k\u1EBFt qu\u1EA3 do URL sai, KH\xD4NG ph\u1EA3i t\u01B0\u1EDDng \u0111\u0103ng nh\u1EADp. Th\u1EED l\u1EA1i ngay m\u1ED9t trong hai d\u1EA1ng URL \u0111\xFAng \u1EDF tr\xEAn; kh\xF4ng b\u1EA3o ng\u01B0\u1EDDi d\xF9ng \u0111\u0103ng nh\u1EADp v\xE0 kh\xF4ng k\u1EBFt lu\u1EADn site kh\xF4ng c\xF3 nh\xE0 cung c\u1EA5p. "Sign In / Join Free" \u1EDF \u0111\u1EA7u trang ch\u1EC9 l\xE0 thanh menu.
+- V\u1EABn KH\xD4NG b\u1ECBa gi\xE1/MOQ; ch\u1EC9 b\xE1o nh\u1EEFng g\xEC hi\u1EC3n th\u1ECB sau khi trang k\u1EBFt qu\u1EA3 \u0111\xFAng \u0111\xE3 t\u1EA3i.
+`;
 function getMissingGeminiKeyMessage(env = process.env) {
   if (env.VERCEL) {
     return "Ch\u01B0a c\u1EA5u h\xECnh GEMINI_API_KEY. Tr\xEAn Vercel: Project Settings \u2192 Environment Variables, th\xEAm GEMINI_API_KEY cho Production/Preview, r\u1ED3i Redeploy.";
@@ -118121,6 +118131,7 @@ QUAN TR\u1ECCNG \u2014 TRANG WEB TH\u1EACT:
 
 ${PRICE_GROUNDING_RULES}
 ${CAPTCHA_INTERACTION_RULES}
+${MIC_SEARCH_RULES}
 QUY T\u1EAEC QUAN S\xC1T HI\u1EC6N T\u1EA0I (obmc-challenge-detect-20261107):
 - Ch\u1EC9 d\xF9ng DOM thu\u1ED9c tabId + URL + navigationId hi\u1EC7n t\u1EA1i. B\u1ECF n\u1ED9i dung c\u1EE7a l\u1EA7n \u0111i\u1EC1u h\u01B0\u1EDBng tr\u01B0\u1EDBc.
 - ok ch\u1EC9 l\xE0 ch\u01B0a ph\xE1t hi\u1EC7n t\u01B0\u1EDDng, KH\xD4NG ch\u1EE9ng minh m\u1EE5c ti\xEAu ho\xE0n t\u1EA5t. QR ph\u1EA3n h\u1ED3i kh\xF4ng ph\u1EA3i QR \u0111\u0103ng nh\u1EADp.
@@ -118351,7 +118362,7 @@ app.post("/api/extract/:tool", async (req, res) => {
 app.get("/api/extract/health", (_req, res) => {
   res.json({
     ok: true,
-    version: "4.1.7",
+    version: "4.1.8",
     extractTools: [...EXTRACT_TOOL_NAMES],
     playwrightTools: [...PLAYWRIGHT_TOOL_NAMES],
     mailTools: [...MAIL_TOOL_NAMES],

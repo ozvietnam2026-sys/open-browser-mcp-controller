@@ -1,4 +1,4 @@
-# Feature Matrix — Open Browser MCP Controller v4.1.7
+# Feature Matrix — Open Browser MCP Controller v4.1.8
 
 Inventory of advanced / lesser-known features researched from public sources and adoption status.
 Ideas are **reimplemented** (not copied) under compatible licenses; paid SaaS APIs are not required.
@@ -165,3 +165,11 @@ Legend: **adopted** = in repo · **planned** = backlog · **N/A** = not applicab
 | Real iframe pixels / Gemini image blocks | planned P1 | Canvas is simulated; Gemini uses text blocks only. |
 | Chrome routing / login pause + Continue | planned P1 | Not implemented in this hotfix. No captcha-solving services or auth weakening. |
 | Made-in-China.com fixtures | planned | Upcoming supplier search/lookup site; require live evidence before adding site-specific cases. |
+
+## Made-in-China search (v4.1.8 / obmc-mic-search-20261107)
+
+| Item | Status | Notes |
+|---|---|---|
+| Not-available page classification | Done | "information you are looking for is not available currently" → `empty_or_not_ready` / `blocked`; "Sign In / Join Free" chrome alone is not `login_wall`. |
+| Agent search URL rules (`MIC_SEARCH_RULES`) | Done (prompt) | Good: `productdirectory.do?word=…&subaction=hunt`, `products-search/hot-china-products/{Title_Case}.html`. Bad (404): `multi-search/…+…/1.html`, `productdirectory.do` without `subaction=hunt`. Verified by direct HTTP, not by CI. |
+| Listings render through Vercel proxy | Unverified | Not claimed; needs live test. |

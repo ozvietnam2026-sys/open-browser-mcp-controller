@@ -4,7 +4,7 @@
 **VI** · Giao diện trình duyệt trong app + máy chủ MCP: trích xuất web đa chiến lược, CDP/DevTools, hộp thư agent, điều khiển UI AI, profile/caps, map/search/theo dõi thay đổi.
 
 Live (Vercel): https://open-browser-mcp-controller-ten.vercel.app  
-Version: **4.1.7** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
+Version: **4.1.8** · Feature matrix: [`docs/FEATURE_MATRIX.md`](docs/FEATURE_MATRIX.md)
 
 ---
 
@@ -19,6 +19,12 @@ Vite + React UI + Express MCP server. Agents can:
 4. Use an **agent mailbox** (`mail_*`) — file persistence via `MAIL_PERSIST_PATH`; ephemeral on Vercel
 5. Drive **logged-in browser AI UIs** (`ai_*`) — Docker / local
 6. Inspect **profiles / caps / cache** (`meta_*`) — always visible
+
+### v4.1.8 — Made-in-China search URLs + not-available classification (`obmc-mic-search-20261107`)
+
+- Branded "The information you are looking for is not available currently." pages are classified `empty_or_not_ready` (gate → `blocked`), not `ok`, not a login wall. Header chrome like "Sign In / Join Free" alone is not a login wall.
+- The in-app agent now uses `productdirectory.do?word={query}&subaction=hunt` (or `products-search/hot-china-products/{Title_Case}.html`) and avoids `/multi-search/…+…/1.html` and `productdirectory.do` without `subaction=hunt` (both 404). Helper: `shared/mic-search.ts`.
+- Not captcha bypass, and not a claim that every Made-in-China listing loads through the Vercel proxy.
 
 ### v4.1.7 — grounded observations (P0)
 - `tabId + URL + navigationId` bind DOM, extraction and simulated screenshot metadata. Navigation/history/reload invalidate caches; mismatched iframe messages are ignored.
