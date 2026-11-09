@@ -12,6 +12,7 @@ import { ALL_MCP_TOOLS, getVisibleTools, executeRegisteredTool } from './tools-r
 import { getConfig } from './config.js';
 import { formatReadProgress, sliceDocumentText } from '../shared/page-observation.js';
 import { normalizeExtractSchema } from '../shared/listing-extract.js';
+import { chatAskViaCdp } from './chat-driver-v2.js';
 
 export { MCP_BROWSER_TOOLS };
 export { ALL_MCP_TOOLS };
@@ -704,6 +705,29 @@ export class McpServerHandler {
                 : `❌ Lỗi trích xuất: ${result.error}`,
             },
           ],
+        };
+      }
+
+      case 'browser_chat_ask': {
+        // obmc-chat-driver-20261109 — send a prompt to an AI chat UI (DeepSeek/Gemini/Kimi)
+        // via CDP, wait for the response, return it. No API key — uses browser sessions.
+        const { site, question, timeout = 120000 } = args;
+        if (!site || !question) {
+          return { isError: true, content: [{ type: 'text', text: 'Thiếu site (deepseek/gemini/kimi) hoặc question' }] };
+        }
+        const validSites = ['deepseek', 'gemini', 'kimi'];
+        if (!validSites.includes(site)) {
+          return { isError: true, content: [{ type: 'text', text: `Site "${site}" không hỗ trợ. Chọn: ${validSites.join('/')}` }] };
+        }
+        const result = await chatAskViaCdp(site, String(question).slice(0, 4000), Number(timeout) || 120000);
+        if (result.error) {
+          return { isError: true, content: [{ type: 'text', text: `❌ ${result.error}` }] };
+        }
+        return {
+          content: [{
+            type: 'text',
+            text: `💬 ${site.toUpperCase()} trả lời (${result.timingMs}ms):\n${result.answer}`,
+          }],
         };
       }
 

@@ -390,6 +390,30 @@ export const MCP_BROWSER_TOOLS: McpToolDefinition[] = [
     },
   },
   {
+    name: 'browser_chat_ask',
+    description:
+      'Gửi câu hỏi vào AI chat UI (DeepSeek/Gemini/Kimi) qua CDP và đọc câu trả lời — KHÔNG cần API key, dùng phiên đăng nhập sẵn trên Chrome 24/7. Trả về: câu trả lời + thời gian (ms).',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        site: {
+          type: 'string',
+          enum: ['deepseek', 'gemini', 'kimi'],
+          description: 'Site AI chat cần hỏi (deepseek = nhanh nhất ~1s, gemini = Pro, kimi = K3.1 Pro)',
+        },
+        question: {
+          type: 'string',
+          description: 'Câu hỏi cần gửi (tối đa 4000 ký tự)',
+        },
+        timeout: {
+          type: 'number',
+          description: 'Timeout ms (mặc định 120000)',
+        },
+      },
+      required: ['site', 'question'],
+    },
+  },
+  {
     name: 'browser_scroll',
     description: 'Cuộn trang web theo các hướng: down (xuống), up (lên), top (đầu trang), bottom (cuối trang) với khoảng cách pixel tùy chọn.',
     inputSchema: {

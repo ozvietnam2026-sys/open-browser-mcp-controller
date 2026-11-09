@@ -25178,6 +25178,29 @@ var init_mcp_browser_tools = __esm({
         }
       },
       {
+        name: "browser_chat_ask",
+        description: "G\u1EEDi c\xE2u h\u1ECFi v\xE0o AI chat UI (DeepSeek/Gemini/Kimi) qua CDP v\xE0 \u0111\u1ECDc c\xE2u tr\u1EA3 l\u1EDDi \u2014 KH\xD4NG c\u1EA7n API key, d\xF9ng phi\xEAn \u0111\u0103ng nh\u1EADp s\u1EB5n tr\xEAn Chrome 24/7. Tr\u1EA3 v\u1EC1: c\xE2u tr\u1EA3 l\u1EDDi + th\u1EDDi gian (ms).",
+        inputSchema: {
+          type: "object",
+          properties: {
+            site: {
+              type: "string",
+              enum: ["deepseek", "gemini", "kimi"],
+              description: "Site AI chat c\u1EA7n h\u1ECFi (deepseek = nhanh nh\u1EA5t ~1s, gemini = Pro, kimi = K3.1 Pro)"
+            },
+            question: {
+              type: "string",
+              description: "C\xE2u h\u1ECFi c\u1EA7n g\u1EEDi (t\u1ED1i \u0111a 4000 k\xFD t\u1EF1)"
+            },
+            timeout: {
+              type: "number",
+              description: "Timeout ms (m\u1EB7c \u0111\u1ECBnh 120000)"
+            }
+          },
+          required: ["site", "question"]
+        }
+      },
+      {
         name: "browser_scroll",
         description: "Cu\u1ED9n trang web theo c\xE1c h\u01B0\u1EDBng: down (xu\u1ED1ng), up (l\xEAn), top (\u0111\u1EA7u trang), bottom (cu\u1ED1i trang) v\u1EDBi kho\u1EA3ng c\xE1ch pixel t\xF9y ch\u1ECDn.",
         inputSchema: {
@@ -98740,6 +98763,148 @@ function normalizeExtractSchema(input) {
   return { schema: { baseSelector, fields, maxRows } };
 }
 
+// server/chat-driver-v2.ts
+init_runtime();
+var SITES = {
+  deepseek: {
+    url: "chat.deepseek.com",
+    typeExpr: (q) => `(function(){
+      const ta = document.querySelector('textarea');
+      if (!ta) return 'no-input';
+      ta.focus();
+      const s = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set;
+      s.call(ta, ${JSON.stringify(q)});
+      ta.dispatchEvent(new Event('input', {bubbles: true}));
+      return 'ok';
+    })()`,
+    sendExpr: `(function(){
+      const ta = document.querySelector('textarea');
+      if (!ta) return 'no-input';
+      ta.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', keyCode:13, which:13, bubbles:true}));
+      return 'sent';
+    })()`,
+    responseExpr: `(function(){
+      const els = document.querySelectorAll('[class*="message"]');
+      let last = '';
+      for (const el of els) {
+        const t = (el.textContent || '').trim();
+        if (t && t.length > 3 && t !== arguments[1]) last = t;
+      }
+      return last;
+    })()`
+  },
+  gemini: {
+    url: "gemini.google.com",
+    typeExpr: (q) => `(function(){
+      const ed = document.querySelector('[contenteditable="true"], [role="textbox"]');
+      if (!ed) return 'no-input';
+      ed.focus();
+      ed.textContent = ${JSON.stringify(q)};
+      ed.dispatchEvent(new Event('input', {bubbles: true}));
+      return 'ok';
+    })()`,
+    sendExpr: `(function(){
+      const ed = document.querySelector('[contenteditable="true"], [role="textbox"]');
+      if (!ed) return 'no-input';
+      ed.dispatchEvent(new KeyboardEvent('keydown', {key:'Enter', code:'Enter', keyCode:13, which:13, bubbles:true}));
+      return 'sent';
+    })()`,
+    responseExpr: `(function(){
+      const els = document.querySelectorAll('[class*="response"], [class*="message-container"]');
+      let last = '';
+      for (const el of els) {
+        const t = (el.textContent || '').trim();
+        if (t && t.length > 3) last = t;
+      }
+      return last;
+    })()`
+  },
+  kimi: {
+    url: "kimi.ai",
+    typeExpr: (q) => `(function(){
+      const ed = document.querySelector('.chat-input-editor, [contenteditable="true"]');
+      if (!ed) return 'no-input';
+      ed.focus();
+      ed.textContent = ${JSON.stringify(q)};
+      ed.dispatchEvent(new Event('input', {bubbles: true}));
+      return 'ok';
+    })()`,
+    sendExpr: `(function(){
+      const btn = document.querySelector('.send-button-container');
+      if (btn) { btn.click(); return 'sent'; }
+      return 'no-send-btn';
+    })()`,
+    responseExpr: `(function(){
+      const els = document.querySelectorAll('[class*="message"]');
+      let last = '';
+      for (const el of els) {
+        const t = (el.textContent || '').trim();
+        if (t && t.length > 3) last = t;
+      }
+      return last;
+    })()`
+  }
+};
+async function chatAskViaCdp(site, question, timeoutMs = 12e4) {
+  const cfg = SITES[site];
+  if (!cfg) return { site, answer: "", timingMs: 0, error: `Site kh\xF4ng h\u1ED7 tr\u1EE3: ${site}` };
+  const started = Date.now();
+  try {
+    const page2 = await getPage();
+    if (!page2.url().includes(cfg.url)) {
+      await page2.goto(`https://${cfg.url}`, { timeout: 3e4 });
+      await sleep(3e3);
+    }
+    const typeRes = String(await page2.evaluate(cfg.typeExpr(question)));
+    if (typeRes !== "ok") {
+      return { site, answer: "", timingMs: Date.now() - started, error: `Type failed: ${typeRes}` };
+    }
+    await sleep(500);
+    const sendRes = String(await page2.evaluate(cfg.sendExpr));
+    if (sendRes !== "sent") {
+      return { site, answer: "", timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
+    }
+    const qSnippet = question.slice(0, 30);
+    const deadline = Date.now() + Number(timeoutMs);
+    let lastResponse = "";
+    const respSel = site === "deepseek" ? '[class*="message"]' : site === "gemini" ? '[class*="response"], [class*="message-container"]' : '[class*="message"]';
+    while (Date.now() < deadline) {
+      await sleep(1500);
+      const resp = String(await page2.evaluate(`(function(){
+        const els = document.querySelectorAll('${respSel}');
+        let last = '';
+        for (const el of els) {
+          const t = (el.textContent || '').trim();
+          if (t && t.length > 5 && !t.includes(${JSON.stringify(qSnippet)})) last = t;
+        }
+        return last;
+      })()`));
+      if (resp && resp.length > 5 && resp !== lastResponse) {
+        lastResponse = resp;
+        await sleep(2e3);
+        const checkAgain = String(await page2.evaluate(`(function(){
+          const els = document.querySelectorAll('${respSel}');
+          let last = '';
+          for (const el of els) {
+            const t = (el.textContent || '').trim();
+            if (t && t.length > 5 && !t.includes(${JSON.stringify(qSnippet)})) last = t;
+          }
+          return last;
+        })()`));
+        if (checkAgain === resp || checkAgain.length <= resp.length) {
+          return { site, answer: resp.slice(0, 4e3), timingMs: Date.now() - started };
+        }
+      }
+    }
+    return { site, answer: String(lastResponse).slice(0, 4e3) || "", timingMs: Date.now() - started, error: lastResponse ? void 0 : "Timeout" };
+  } catch (err) {
+    return { site, answer: "", timingMs: Date.now() - started, error: `L\u1ED7i: ${err?.message || err}` };
+  }
+}
+function sleep(ms) {
+  return new Promise((r2) => setTimeout(r2, ms));
+}
+
 // server/mcp-server.ts
 var mcpSessions = /* @__PURE__ */ new Map();
 var McpServerHandler = class _McpServerHandler {
@@ -99327,6 +99492,27 @@ ${snapshot.simplifiedTree || snapshot.textExcerpt}`
 ${JSON.stringify(result.data, null, 2)}` : `\u274C L\u1ED7i tr\xEDch xu\u1EA5t: ${result.error}`
             }
           ]
+        };
+      }
+      case "browser_chat_ask": {
+        const { site, question, timeout = 12e4 } = args;
+        if (!site || !question) {
+          return { isError: true, content: [{ type: "text", text: "Thi\u1EBFu site (deepseek/gemini/kimi) ho\u1EB7c question" }] };
+        }
+        const validSites = ["deepseek", "gemini", "kimi"];
+        if (!validSites.includes(site)) {
+          return { isError: true, content: [{ type: "text", text: `Site "${site}" kh\xF4ng h\u1ED7 tr\u1EE3. Ch\u1ECDn: ${validSites.join("/")}` }] };
+        }
+        const result = await chatAskViaCdp(site, String(question).slice(0, 4e3), Number(timeout) || 12e4);
+        if (result.error) {
+          return { isError: true, content: [{ type: "text", text: `\u274C ${result.error}` }] };
+        }
+        return {
+          content: [{
+            type: "text",
+            text: `\u{1F4AC} ${site.toUpperCase()} tr\u1EA3 l\u1EDDi (${result.timingMs}ms):
+${result.answer}`
+          }]
         };
       }
       case "browser_extract_listings": {
@@ -117831,7 +118017,7 @@ async function uploadBlobInternal(file, uploadUrl, apiClient, httpOptions) {
         break;
       }
       retryCount++;
-      await sleep(currentDelayMs);
+      await sleep2(currentDelayMs);
       currentDelayMs = currentDelayMs * DELAY_MULTIPLIER;
     }
     offset += chunkSize;
@@ -117848,7 +118034,7 @@ async function getBlobStat(file) {
   const fileStat = { size: file.size, type: file.type };
   return fileStat;
 }
-function sleep(ms) {
+function sleep2(ms) {
   return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 var NodeUploader = class {
@@ -118033,7 +118219,7 @@ var NodeUploader = class {
             break;
           }
           retryCount++;
-          await sleep(currentDelayMs);
+          await sleep2(currentDelayMs);
           currentDelayMs = currentDelayMs * DELAY_MULTIPLIER;
         }
         offset += bytesRead;
