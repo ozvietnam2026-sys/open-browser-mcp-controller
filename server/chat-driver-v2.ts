@@ -54,6 +54,53 @@ function getTabs(cdpUrl: string): Promise<any[]> {
   });
 }
 
+/** Insert text via CDP Input level (works with React rich-text editors that resist DOM manipulation) */
+function insertTextViaCdp(wsUrl: string, text: string, focusExpr: string, timeoutMs = 10_000): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl, { handshakeTimeout: 5000 });
+    const timer = setTimeout(() => { ws.close(); reject(new Error('insert timeout')); }, timeoutMs);
+    let step = 0;
+    ws.on('open', () => {
+      // Step 1: Focus the editor via Runtime.evaluate
+      ws.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: focusExpr, returnByValue: true } }));
+    });
+    ws.on('message', (data: WebSocket.Data) => {
+      try {
+        const msg = JSON.parse(String(data));
+        if (msg.id === 1 && step === 0) {
+          step = 1;
+          // Step 2: Insert text at browser input level
+          ws.send(JSON.stringify({ id: 2, method: 'Input.insertText', params: { text } }));
+        } else if (msg.id === 2 && step === 1) {
+          step = 2;
+          clearTimeout(timer); ws.close(); resolve(true);
+        }
+      } catch { /* ignore */ }
+    });
+    ws.on('error', (err) => { clearTimeout(timer); reject(err); });
+  });
+}
+
+/** Send Enter key via CDP Input level */
+function pressEnterViaCdp(wsUrl: string, timeoutMs = 5_000): Promise<boolean> {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(wsUrl, { handshakeTimeout: 5000 });
+    const timer = setTimeout(() => { ws.close(); reject(new Error('enter timeout')); }, timeoutMs);
+    ws.on('open', () => {
+      ws.send(JSON.stringify({ id: 1, method: 'Input.dispatchKeyEvent', params: { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 } }));
+    });
+    ws.on('message', (data: WebSocket.Data) => {
+      const msg = JSON.parse(String(data));
+      if (msg.id === 1) {
+        ws.send(JSON.stringify({ id: 2, method: 'Input.dispatchKeyEvent', params: { type: 'keyUp', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13, nativeVirtualKeyCode: 13 } }));
+      } else if (msg.id === 2) {
+        clearTimeout(timer); ws.close(); resolve(true);
+      }
+    });
+    ws.on('error', (err) => { clearTimeout(timer); reject(err); });
+  });
+}
+
 /** Evaluate JS in a tab via WebSocket CDP */
 function evalInTab(wsUrl: string, expr: string, timeoutMs = 10_000): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -100,17 +147,37 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
     const wsUrl = tab.webSocketDebuggerUrl;
 
     // Step 2: Type the question
-    const typeRes = await evalInTab(wsUrl, cfg.typeExpr(question));
-    if (typeRes !== 'ok') {
-      return { site, answer: '', timingMs: Date.now() - started, error: `Type failed: ${typeRes}` };
+    // Kimi: dùng CDP Input.insertText (browser-level, bypasses React state)
+    // Others: dùng Runtime.evaluate (DOM-level, works với textarea/contenteditable)
+    if (site === 'kimi') {
+      try {
+        await insertTextViaCdp(wsUrl, question,
+          `document.querySelector('.chat-input-editor,[contenteditable="true"]')?.focus(); 'ok'`
+        );
+      } catch (e: any) {
+        return { site, answer: '', timingMs: Date.now() - started, error: `Kimi insert failed: ${e?.message}` };
+      }
+    } else {
+      const typeRes = await evalInTab(wsUrl, cfg.typeExpr(question));
+      if (typeRes !== 'ok') {
+        return { site, answer: '', timingMs: Date.now() - started, error: `Type failed: ${typeRes}` };
+      }
     }
 
     await new Promise(r => setTimeout(r, 500));
 
     // Step 3: Send
-    const sendRes = await evalInTab(wsUrl, cfg.sendExpr);
-    if (sendRes !== 'sent') {
-      return { site, answer: '', timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
+    if (site === 'kimi') {
+      // Kimi: click send button via Runtime.evaluate
+      const sendRes = await evalInTab(wsUrl, cfg.sendExpr);
+      if (sendRes !== 'sent') {
+        return { site, answer: '', timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
+      }
+    } else {
+      const sendRes = await evalInTab(wsUrl, cfg.sendExpr);
+      if (sendRes !== 'sent') {
+        return { site, answer: '', timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
+      }
     }
 
     // Step 3.5: Đếm số messages TRƯỚC khi gửi (để chỉ đọc message MỚI)
@@ -125,7 +192,7 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
       let newText='';
       for(let i=before;i<els.length;i++){
         const t=(els[i].textContent||'').trim();
-        if(t&&t.length>3)newText=t;
+        if(t&&t.length>0)newText=t;
       }
       // Fallback: nếu không có element mới, lấy element cuối có text khác câu hỏi
       if(!newText&&els.length>0){

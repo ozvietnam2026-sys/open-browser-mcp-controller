@@ -98815,6 +98815,38 @@ function getTabs(cdpUrl) {
     }).on("error", reject);
   });
 }
+function insertTextViaCdp(wsUrl, text3, focusExpr, timeoutMs = 1e4) {
+  return new Promise((resolve, reject) => {
+    const ws = new wrapper_default(wsUrl, { handshakeTimeout: 5e3 });
+    const timer = setTimeout(() => {
+      ws.close();
+      reject(new Error("insert timeout"));
+    }, timeoutMs);
+    let step = 0;
+    ws.on("open", () => {
+      ws.send(JSON.stringify({ id: 1, method: "Runtime.evaluate", params: { expression: focusExpr, returnByValue: true } }));
+    });
+    ws.on("message", (data2) => {
+      try {
+        const msg = JSON.parse(String(data2));
+        if (msg.id === 1 && step === 0) {
+          step = 1;
+          ws.send(JSON.stringify({ id: 2, method: "Input.insertText", params: { text: text3 } }));
+        } else if (msg.id === 2 && step === 1) {
+          step = 2;
+          clearTimeout(timer);
+          ws.close();
+          resolve(true);
+        }
+      } catch {
+      }
+    });
+    ws.on("error", (err) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+  });
+}
 function evalInTab(wsUrl, expr, timeoutMs = 1e4) {
   return new Promise((resolve, reject) => {
     const ws = new wrapper_default(wsUrl, { handshakeTimeout: 5e3 });
@@ -98854,14 +98886,33 @@ async function chatAskViaCdp(site, question, timeoutMs = 12e4) {
       return { site, answer: "", timingMs: Date.now() - started, error: `Kh\xF4ng t\xECm th\u1EA5y tab ${site} tr\xEAn Chrome (CDP: ${cdpUrl})` };
     }
     const wsUrl = tab.webSocketDebuggerUrl;
-    const typeRes = await evalInTab(wsUrl, cfg.typeExpr(question));
-    if (typeRes !== "ok") {
-      return { site, answer: "", timingMs: Date.now() - started, error: `Type failed: ${typeRes}` };
+    if (site === "kimi") {
+      try {
+        await insertTextViaCdp(
+          wsUrl,
+          question,
+          `document.querySelector('.chat-input-editor,[contenteditable="true"]')?.focus(); 'ok'`
+        );
+      } catch (e2) {
+        return { site, answer: "", timingMs: Date.now() - started, error: `Kimi insert failed: ${e2?.message}` };
+      }
+    } else {
+      const typeRes = await evalInTab(wsUrl, cfg.typeExpr(question));
+      if (typeRes !== "ok") {
+        return { site, answer: "", timingMs: Date.now() - started, error: `Type failed: ${typeRes}` };
+      }
     }
     await new Promise((r2) => setTimeout(r2, 500));
-    const sendRes = await evalInTab(wsUrl, cfg.sendExpr);
-    if (sendRes !== "sent") {
-      return { site, answer: "", timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
+    if (site === "kimi") {
+      const sendRes = await evalInTab(wsUrl, cfg.sendExpr);
+      if (sendRes !== "sent") {
+        return { site, answer: "", timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
+      }
+    } else {
+      const sendRes = await evalInTab(wsUrl, cfg.sendExpr);
+      if (sendRes !== "sent") {
+        return { site, answer: "", timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
+      }
     }
     const countBefore = parseInt(await evalInTab(
       wsUrl,
@@ -98873,7 +98924,7 @@ async function chatAskViaCdp(site, question, timeoutMs = 12e4) {
       let newText='';
       for(let i=before;i<els.length;i++){
         const t=(els[i].textContent||'').trim();
-        if(t&&t.length>3)newText=t;
+        if(t&&t.length>0)newText=t;
       }
       // Fallback: n\u1EBFu kh\xF4ng c\xF3 element m\u1EDBi, l\u1EA5y element cu\u1ED1i c\xF3 text kh\xE1c c\xE2u h\u1ECFi
       if(!newText&&els.length>0){
