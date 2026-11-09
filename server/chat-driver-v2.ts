@@ -185,7 +185,7 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
       }
     }
 
-    // Step 4: Poll — chỉ đọc message thứ N+1 trở đi (message MỚI)
+    // Step 4: Poll — CHỈ đọc message thứ N+1 trở đi (message MỚI), KHÔNG fallback về element cũ
     const pollExpr = `(function(){
       const els=document.querySelectorAll('${cfg.responseSel}');
       const before=${countBefore};
@@ -194,12 +194,6 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
         const t=(els[i].textContent||'').trim();
         if(t&&t.length>0)newText=t;
       }
-      // Fallback: nếu không có element mới, lấy element cuối có text khác câu hỏi
-      if(!newText&&els.length>0){
-        const last=els[els.length-1];
-        const t=(last.textContent||'').trim();
-        if(t&&!t.includes(${JSON.stringify(question.slice(0,20))}))newText=t;
-      }
       return newText;
     })()`;
 
@@ -207,7 +201,7 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
     let lastResp = '';
 
     while (Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 3000));
       const resp = await evalInTab(wsUrl, pollExpr);
 
       if (resp && resp.length > 0 && resp !== lastResp) {
@@ -224,7 +218,6 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
             return { site, answer: resp.slice(0, 4000), timingMs: Date.now() - started };
           }
         } catch {
-          // If re-check fails, return what we have
           return { site, answer: resp.slice(0, 4000), timingMs: Date.now() - started };
         }
       }

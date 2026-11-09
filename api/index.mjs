@@ -98926,18 +98926,12 @@ async function chatAskViaCdp(site, question, timeoutMs = 12e4) {
         const t=(els[i].textContent||'').trim();
         if(t&&t.length>0)newText=t;
       }
-      // Fallback: n\u1EBFu kh\xF4ng c\xF3 element m\u1EDBi, l\u1EA5y element cu\u1ED1i c\xF3 text kh\xE1c c\xE2u h\u1ECFi
-      if(!newText&&els.length>0){
-        const last=els[els.length-1];
-        const t=(last.textContent||'').trim();
-        if(t&&!t.includes(${JSON.stringify(question.slice(0, 20))}))newText=t;
-      }
       return newText;
     })()`;
     const deadline = Date.now() + Number(timeoutMs);
     let lastResp = "";
     while (Date.now() < deadline) {
-      await new Promise((r2) => setTimeout(r2, 2e3));
+      await new Promise((r2) => setTimeout(r2, 3e3));
       const resp = await evalInTab(wsUrl, pollExpr);
       if (resp && resp.length > 0 && resp !== lastResp) {
         if (resp.length <= 10) {
