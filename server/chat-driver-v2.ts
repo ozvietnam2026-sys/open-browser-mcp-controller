@@ -210,12 +210,21 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
       await new Promise(r => setTimeout(r, 2000));
       const resp = await evalInTab(wsUrl, pollExpr);
 
-      if (resp && resp.length > 3 && resp !== lastResp) {
+      if (resp && resp.length > 0 && resp !== lastResp) {
+        // Short answers (≤ 10 chars): return immediately — they're complete
+        if (resp.length <= 10) {
+          return { site, answer: resp.slice(0, 4000), timingMs: Date.now() - started };
+        }
+        // Long answers: wait 3s then check if still growing (streaming)
         lastResp = resp;
-        // Wait 3s then check again — if same length, response is complete
         await new Promise(r => setTimeout(r, 3000));
-        const again = await evalInTab(wsUrl, pollExpr);
-        if (again === resp) {
+        try {
+          const again = await evalInTab(wsUrl, pollExpr);
+          if (again === resp || String(again).length <= resp.length) {
+            return { site, answer: resp.slice(0, 4000), timingMs: Date.now() - started };
+          }
+        } catch {
+          // If re-check fails, return what we have
           return { site, answer: resp.slice(0, 4000), timingMs: Date.now() - started };
         }
       }

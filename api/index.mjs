@@ -98939,11 +98939,18 @@ async function chatAskViaCdp(site, question, timeoutMs = 12e4) {
     while (Date.now() < deadline) {
       await new Promise((r2) => setTimeout(r2, 2e3));
       const resp = await evalInTab(wsUrl, pollExpr);
-      if (resp && resp.length > 3 && resp !== lastResp) {
+      if (resp && resp.length > 0 && resp !== lastResp) {
+        if (resp.length <= 10) {
+          return { site, answer: resp.slice(0, 4e3), timingMs: Date.now() - started };
+        }
         lastResp = resp;
         await new Promise((r2) => setTimeout(r2, 3e3));
-        const again = await evalInTab(wsUrl, pollExpr);
-        if (again === resp) {
+        try {
+          const again = await evalInTab(wsUrl, pollExpr);
+          if (again === resp || String(again).length <= resp.length) {
+            return { site, answer: resp.slice(0, 4e3), timingMs: Date.now() - started };
+          }
+        } catch {
           return { site, answer: resp.slice(0, 4e3), timingMs: Date.now() - started };
         }
       }
