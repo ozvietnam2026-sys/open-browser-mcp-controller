@@ -31,7 +31,7 @@ const SITES: Record<string, SiteConfig> = {
     hostMatch: 'gemini.google.com',
     typeExpr: (q) => `(function(){const e=document.querySelector('[contenteditable="true"],[role="textbox"]');if(!e)return 'no-input';e.focus();e.textContent=${JSON.stringify(q)};e.dispatchEvent(new Event('input',{bubbles:true}));return 'ok';})()`,
     sendExpr: `(function(){const e=document.querySelector('[contenteditable="true"],[role="textbox"]');if(!e)return 'no-input';e.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));return 'sent';})()`,
-    responseSel: '[class*="response"], [class*="message-container"]',
+    responseSel: '[class*="model-response"], [class*="response-container"], .markdown',
   },
   kimi: {
     hostMatch: 'kimi.ai',
@@ -111,28 +111,42 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
       return { site, answer: '', timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
     }
 
-    // Step 4: Poll for response
-    const qSnippet = question.slice(0, 30);
+    // Step 3.5: Đếm số messages TRƯỚC khi gửi (để chỉ đọc message MỚI)
+    const countBefore = parseInt(await evalInTab(wsUrl,
+      `document.querySelectorAll('${cfg.responseSel}').length`
+    )) || 0;
+
+    // Step 4: Poll — chỉ đọc message thứ N+1 trở đi (message MỚI)
     const pollExpr = `(function(){
       const els=document.querySelectorAll('${cfg.responseSel}');
-      let last='';
-      for(const el of els){const t=(el.textContent||'').trim();if(t&&t.length>5&&!t.includes(${JSON.stringify(qSnippet)}))last=t;}
-      return last;
+      const before=${countBefore};
+      let newText='';
+      for(let i=before;i<els.length;i++){
+        const t=(els[i].textContent||'').trim();
+        if(t&&t.length>3)newText=t;
+      }
+      // Fallback: nếu không có element mới, lấy element cuối có text khác câu hỏi
+      if(!newText&&els.length>0){
+        const last=els[els.length-1];
+        const t=(last.textContent||'').trim();
+        if(t&&!t.includes(${JSON.stringify(question.slice(0,20))}))newText=t;
+      }
+      return newText;
     })()`;
 
     const deadline = Date.now() + Number(timeoutMs);
     let lastResp = '';
 
     while (Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 2000));
       const resp = await evalInTab(wsUrl, pollExpr);
 
-      if (resp && resp.length > 5 && resp !== lastResp) {
+      if (resp && resp.length > 3 && resp !== lastResp) {
         lastResp = resp;
-        // Wait 2s then check again to see if still streaming
-        await new Promise(r => setTimeout(r, 2000));
+        // Wait 3s then check again — if same length, response is complete
+        await new Promise(r => setTimeout(r, 3000));
         const again = await evalInTab(wsUrl, pollExpr);
-        if (again === resp || again.length <= resp.length) {
+        if (again === resp) {
           return { site, answer: resp.slice(0, 4000), timingMs: Date.now() - started };
         }
       }
