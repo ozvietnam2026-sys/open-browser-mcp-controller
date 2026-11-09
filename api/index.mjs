@@ -98886,6 +98886,10 @@ async function chatAskViaCdp(site, question, timeoutMs = 12e4) {
       return { site, answer: "", timingMs: Date.now() - started, error: `Kh\xF4ng t\xECm th\u1EA5y tab ${site} tr\xEAn Chrome (CDP: ${cdpUrl})` };
     }
     const wsUrl = tab.webSocketDebuggerUrl;
+    const countBefore = parseInt(await evalInTab(
+      wsUrl,
+      `document.querySelectorAll('${cfg.responseSel}').length`
+    )) || 0;
     if (site === "kimi") {
       try {
         await insertTextViaCdp(
@@ -98914,10 +98918,6 @@ async function chatAskViaCdp(site, question, timeoutMs = 12e4) {
         return { site, answer: "", timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
       }
     }
-    const countBefore = parseInt(await evalInTab(
-      wsUrl,
-      `document.querySelectorAll('${cfg.responseSel}').length`
-    )) || 0;
     const pollExpr = `(function(){
       const els=document.querySelectorAll('${cfg.responseSel}');
       const before=${countBefore};

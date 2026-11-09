@@ -146,6 +146,11 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
     }
     const wsUrl = tab.webSocketDebuggerUrl;
 
+    // Step 1.5: Đếm số messages TRƯỚC khi gửi (PHẢI lấy trước khi type/send!)
+    const countBefore = parseInt(await evalInTab(wsUrl,
+      `document.querySelectorAll('${cfg.responseSel}').length`
+    )) || 0;
+
     // Step 2: Type the question
     // Kimi: dùng CDP Input.insertText (browser-level, bypasses React state)
     // Others: dùng Runtime.evaluate (DOM-level, works với textarea/contenteditable)
@@ -179,11 +184,6 @@ export async function chatAskViaCdp(site: string, question: string, timeoutMs = 
         return { site, answer: '', timingMs: Date.now() - started, error: `Send failed: ${sendRes}` };
       }
     }
-
-    // Step 3.5: Đếm số messages TRƯỚC khi gửi (để chỉ đọc message MỚI)
-    const countBefore = parseInt(await evalInTab(wsUrl,
-      `document.querySelectorAll('${cfg.responseSel}').length`
-    )) || 0;
 
     // Step 4: Poll — chỉ đọc message thứ N+1 trở đi (message MỚI)
     const pollExpr = `(function(){
