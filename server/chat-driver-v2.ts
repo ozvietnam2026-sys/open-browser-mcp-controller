@@ -31,12 +31,14 @@ const SITES: Record<string, SiteConfig> = {
     hostMatch: 'gemini.google.com',
     typeExpr: (q) => `(function(){const e=document.querySelector('[contenteditable="true"],[role="textbox"]');if(!e)return 'no-input';e.focus();e.textContent=${JSON.stringify(q)};e.dispatchEvent(new Event('input',{bubbles:true}));return 'ok';})()`,
     sendExpr: `(function(){const e=document.querySelector('[contenteditable="true"],[role="textbox"]');if(!e)return 'no-input';e.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,which:13,bubbles:true}));return 'sent';})()`,
-    responseSel: '[class*="model-response"], [class*="response-container"], .markdown',
+    // Verified live: Gemini response nằm trong <message-content> (Angular custom element)
+    responseSel: 'message-content',
   },
   kimi: {
     hostMatch: 'kimi.ai',
-    typeExpr: (q) => `(function(){const e=document.querySelector('.chat-input-editor,[contenteditable="true"]');if(!e)return 'no-input';e.focus();e.textContent=${JSON.stringify(q)};e.dispatchEvent(new Event('input',{bubbles:true}));return 'ok';})()`,
-    sendExpr: `(function(){const b=document.querySelector('.send-button-container');if(b){b.click();return 'sent';}return 'no-send';})()`,
+    // Kimi rich-text editor: dùng execCommand insertText (works với ProseMirror/React)
+    typeExpr: (q) => `(function(){const e=document.querySelector('.chat-input-editor,[contenteditable="true"]');if(!e)return 'no-input';e.focus();document.execCommand('selectAll',false,null);document.execCommand('insertText',false,${JSON.stringify(q)});e.dispatchEvent(new Event('input',{bubbles:true}));return 'ok';})()`,
+    sendExpr: `(function(){const b=document.querySelector('.send-button-container');if(b){b.click();return 'sent';}const e=document.querySelector('[contenteditable="true"],.chat-input-editor');if(e){e.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',code:'Enter',keyCode:13,bubbles:true}));return 'sent';}return 'no-send';})()`,
     responseSel: '[class*="message"]',
   },
 };
